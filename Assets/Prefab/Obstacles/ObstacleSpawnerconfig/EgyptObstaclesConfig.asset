@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5aa7641083c1d77419847b3a7a9e04df, type: 3}
+  m_Name: EgyptObstaclesConfig
+  m_EditorClassIdentifier: 
+  maxObstaclesPerSegment: 2
+  cleanSegmentInterval: 4
+  baseSpawnChance: 0.5
+  difficultyRampRate: 0.05
+  minZGap: 5
+  jumpOverObstacles:
+  - {fileID: 5935519854569491150, guid: d61018a838c29ec4aabe3d7a526c34f3, type: 3}
+  slideUnderObstacles: []
+  avoidLaneObstacles: []
+  fullLaneObstacles: []

@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5aa7641083c1d77419847b3a7a9e04df, type: 3}
+  m_Name: RobotObstaclesConfig
+  m_EditorClassIdentifier: 
+  maxObstaclesPerSegment: 40
+  cleanSegmentInterval: 0
+  baseSpawnChance: 1
+  difficultyRampRate: 1
+  minZGap: 50
+  jumpOverObstacles:
+  - {fileID: 421708359406356840, guid: 84cdcbeaf0fb55c43ba7d81bb9950eb8, type: 3}
+  - {fileID: 6363576741587273194, guid: 8137c283e898b73468499e70c40ef564, type: 3}
+  slideUnderObstacles:
+  - {fileID: 5394348742735004595, guid: 4df1cde3439672948896299918853d89, type: 3}
+  avoidLaneObstacles:
+  - {fileID: 9175240756544408021, guid: d7ef3bdad8be924469b6554cb7905c68, type: 3}
+  fullLaneObstacles:
+  - {fileID: 5634355339677576251, guid: ece1c5dad4272754eaa65f219e4cde45, type: 3}
+  - {fileID: 697237914219907011, guid: 346817a93caf0e541bdb76670f46007a, type: 3}
