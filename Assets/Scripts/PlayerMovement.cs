@@ -141,7 +141,7 @@ public class PlayerMovement : MonoBehaviour
 
         nextSpeedIncreaseTime = Time.timeSinceLevelLoad + speedIncreaseInterval;
 
-        if (WorldScrollController.Instance != null)
+        if (WorldScrollController.Instance != null && !WorldScrollController.Instance.HasSpeedProfile)
             WorldScrollController.Instance.ConfigureBaseScrollSpeed(playerSpeed);
     }
 

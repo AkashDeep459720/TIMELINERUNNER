@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4a8e2c19b3d4675a0e1f2c3d4b5a697, type: 3}
+  m_Name: RobotSpawnProfile_Default
+  m_EditorClassIdentifier: 
+  distanceForMaxDifficulty: 500
+  maxDifficultyFactor: 1
+  useDifficultyCurve: 0
+  comboChanceStart: 0.1
+  comboChanceEnd: 0.7
+  useComboChanceCurve: 0
+  minSpacingInsideCombo: 12
+  emptySegmentAfterCombo: 1
+  minGroupSpacing: 10
+  maxGroupSpacing: 18
+  useSpacingCurve: 0
+  emptySegmentInterval: 5
+  graceDistance: 80
+  graceMaxDifficulty: 0.25
+  graceSegmentsAfterRunStart: 2
+  useWeightedPick: 1
+  weightJumpSlide: 1
+  weightLaneBlocker: 1
+  weightFullLane: 0.5
+  fullLaneMaxChance: 0.1
