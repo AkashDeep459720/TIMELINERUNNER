@@ -5134,7 +5134,7 @@ MonoBehaviour:
   player: {fileID: 1534921979}
   maxSegments: 6
   recycleBehindPlayerDistance: 60
-  egyptLandingPoint: {fileID: 3512851040914976783, guid: 88b5886b80c8f6645b3aa06878374de9, type: 3}
+  egyptRunwaySegmentCount: 7
   segmentsRoot: {fileID: 0}
   portalsRoot: {fileID: 0}
   portalBaseYOffset: 1.93

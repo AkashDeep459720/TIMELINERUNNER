@@ -40,7 +40,10 @@ public class SegmentLoopGenerator : MonoBehaviour
     [SerializeField] private float recycleBehindPlayerDistance = 60f;
 
     [Header("Egypt Runway (portal swap)")]
-    [SerializeField] private int egyptRunwaySegmentCount = 3;
+    [Tooltip("Segments spawned synchronously during portal swap (before fade-in).")]
+    [SerializeField] private int egyptRunwaySegmentCount = 7;
+
+    public int EgyptRunwayBurstCount => egyptRunwaySegmentCount;
 
     [Header("World Roots")]
     [SerializeField] private Transform segmentsRoot;
@@ -213,13 +216,15 @@ public class SegmentLoopGenerator : MonoBehaviour
         GameObject[] pool = GetCurrentPool();
         if (pool == null || pool.Length == 0) return;
 
-        for (int i = 0; i < count; i++)
+        int burstCount = Mathf.Max(count, egyptRunwaySegmentCount, maxSegments);
+        for (int i = 0; i < burstCount; i++)
         {
             GameObject prefab = pool[Random.Range(0, pool.Length)];
             SpawnSegment(prefab);
         }
 
         egyptRunwaySpawned = true;
+        PortalEvents.OnEgyptTimelineEntered?.Invoke();
     }
 
     /// <summary>
@@ -243,8 +248,8 @@ public class SegmentLoopGenerator : MonoBehaviour
         GameObject[] pool = egyptSegments;
         if (pool == null || pool.Length == 0) return;
 
-        int count = Mathf.Max(1, egyptRunwaySegmentCount);
-        for (int i = 0; i < count; i++)
+        int burstCount = Mathf.Max(egyptRunwaySegmentCount, maxSegments);
+        for (int i = 0; i < burstCount; i++)
         {
             GameObject prefab = pool[Random.Range(0, pool.Length)];
             SpawnSegment(prefab);
@@ -254,7 +259,7 @@ public class SegmentLoopGenerator : MonoBehaviour
         portalSpawned = true;
         portalQueued = false;
 
-        PortalEvents.OnPortalSpawned?.Invoke(playerTransform.position);
+        PortalEvents.OnEgyptTimelineEntered?.Invoke();
     }
 
     private void ClearActiveSegments()
@@ -300,11 +305,12 @@ public class SegmentLoopGenerator : MonoBehaviour
             worldRot = socket.rotation;
         }
 
-        worldPos = ResolvePortalGroundedPosition(worldPos);
+        Physics.SyncTransforms();
+        worldPos = ResolvePortalGroundedPosition(worldPos, segment);
         if (Blocked(worldPos)) return false;
 
         Quaternion finalRot = worldRot * Quaternion.Euler(portalEulerOffset);
-        SpawnPortal(worldPos, finalRot);
+        SpawnPortal(worldPos, finalRot, segment);
         return true;
     }
 
@@ -338,10 +344,11 @@ public class SegmentLoopGenerator : MonoBehaviour
         float x = emergencyAlignToPlayerX ? player.position.x : 0f;
 
         Vector3 pos = new Vector3(x, groundY, z);
-        pos = ResolvePortalGroundedPosition(pos);
+        Physics.SyncTransforms();
+        pos = ResolvePortalGroundedPosition(pos, null);
         Quaternion rot = Quaternion.LookRotation(Vector3.forward, Vector3.up) * Quaternion.Euler(portalEulerOffset);
 
-        SpawnPortal(pos, rot);
+        SpawnPortal(pos, rot, null);
     }
 
     private bool Blocked(Vector3 worldPos)
@@ -355,17 +362,22 @@ public class SegmentLoopGenerator : MonoBehaviour
         );
     }
 
-    private void SpawnPortal(Vector3 pos, Quaternion rot)
+    private void SpawnPortal(Vector3 pos, Quaternion rot, GameObject hostSegment)
     {
         EnsureRoots();
-        Instantiate(portalPrefab, pos, rot, portalsRoot);
+        GameObject portal = Instantiate(portalPrefab, pos, rot, portalsRoot);
+
+        PortalGroundSnap snap = portal.GetComponent<PortalGroundSnap>();
+        if (snap == null)
+            snap = portal.AddComponent<PortalGroundSnap>();
+        snap.Configure(portalBaseYOffset, groundSnapMask, groundSnapRayHeight, groundSnapRayDistance);
+        snap.SnapToGroundDeferred();
 
         lastPortalDistance = GetRunDistance();
         portalSpawned = true;
         portalQueued = false;
         queuedTime = -1f;
         PortalEvents.OnPortalSpawned?.Invoke(pos);
-
     }
 
     public bool IsInEgyptTimeline => inEgyptTimeline;
@@ -386,17 +398,81 @@ public class SegmentLoopGenerator : MonoBehaviour
         segment.transform.position += Vector3.right * correction;
     }
 
-    private Vector3 ResolvePortalGroundedPosition(Vector3 worldPos)
+    private Vector3 ResolvePortalGroundedPosition(Vector3 worldPos, GameObject hostSegment)
     {
-        Vector3 rayOrigin = worldPos + Vector3.up * groundSnapRayHeight;
-        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, groundSnapRayHeight + groundSnapRayDistance, groundSnapMask, QueryTriggerInteraction.Ignore))
+        float deckY = hostSegment != null ? GetSegmentDeckWorldY(hostSegment) : float.NaN;
+        float rayGroundY = SampleLowestGroundY(worldPos, hostSegment);
+
+        float baseY;
+        if (!float.IsNaN(rayGroundY))
+            baseY = rayGroundY;
+        else if (!float.IsNaN(deckY))
+            baseY = deckY;
+        else
+            baseY = groundY;
+
+        worldPos.y = baseY + portalBaseYOffset;
+        return worldPos;
+    }
+
+    private float GetSegmentDeckWorldY(GameObject segment)
+    {
+        if (segment == null) return float.NaN;
+
+        bool hasBounds = false;
+        Bounds combined = default;
+
+        Renderer[] renderers = segment.GetComponentsInChildren<Renderer>();
+        for (int i = 0; i < renderers.Length; i++)
         {
-            worldPos.y = hit.point.y + portalBaseYOffset;
-            return worldPos;
+            if (renderers[i] == null) continue;
+            if (!hasBounds)
+            {
+                combined = renderers[i].bounds;
+                hasBounds = true;
+            }
+            else
+                combined.Encapsulate(renderers[i].bounds);
         }
 
-        worldPos.y += portalBaseYOffset;
-        return worldPos;
+        Collider[] colliders = segment.GetComponentsInChildren<Collider>();
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] == null || colliders[i].isTrigger) continue;
+            if (!hasBounds)
+            {
+                combined = colliders[i].bounds;
+                hasBounds = true;
+            }
+            else
+                combined.Encapsulate(colliders[i].bounds);
+        }
+
+        return hasBounds ? combined.min.y : float.NaN;
+    }
+
+    private float SampleLowestGroundY(Vector3 worldPos, GameObject hostSegment)
+    {
+        Vector3 rayOrigin = worldPos + Vector3.up * groundSnapRayHeight;
+        float maxDist = groundSnapRayHeight + groundSnapRayDistance;
+        RaycastHit[] hits = Physics.RaycastAll(rayOrigin, Vector3.down, maxDist, groundSnapMask, QueryTriggerInteraction.Ignore);
+        if (hits == null || hits.Length == 0)
+            return float.NaN;
+
+        Transform hostRoot = hostSegment != null ? hostSegment.transform : null;
+        float lowest = float.MaxValue;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            if (hits[i].collider == null) continue;
+            if (hostRoot != null && hits[i].collider.transform.IsChildOf(hostRoot))
+                continue;
+
+            if (hits[i].point.y < lowest)
+                lowest = hits[i].point.y;
+        }
+
+        return lowest < float.MaxValue ? lowest : float.NaN;
     }
 
     private float GetRunDistance()
