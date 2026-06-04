@@ -31,8 +31,11 @@ public class ObstacleSpawner : MonoBehaviour
     private int segmentCounter = 0;
     private float playerDistanceTravelled = 0f;
     private Transform player;
+    private PlayerMovement playerMovement;
     private float lastSpawnZ = -999f;
+    private float lastSpawnDistance = -999f;
     private bool skipNextSegment = false;
+    private bool rootRegistered = false;
 
     private const float segmentLength = 50f;
 
@@ -41,6 +44,9 @@ public class ObstacleSpawner : MonoBehaviour
         if (!segmentGenerator) segmentGenerator = FindFirstObjectByType<SegmentLoopGenerator>();
         if (!obstaclesRoot) obstaclesRoot = new GameObject("ObstaclesRoot").transform;
         if (!player) player = GameObject.FindWithTag("Player")?.transform;
+        if (player) playerMovement = player.GetComponent<PlayerMovement>();
+
+        TryRegisterRoot();
 
         activeConfig = robotConfig;
         Debug.Log("🔵 ObstacleSpawner: Using Robot config at start");
@@ -57,7 +63,11 @@ public class ObstacleSpawner : MonoBehaviour
 
     void Update()
     {
-        if (player) playerDistanceTravelled = player.position.z;
+        TryRegisterRoot();
+        if (WorldScrollController.Instance != null)
+            playerDistanceTravelled = WorldScrollController.Instance.DistanceTravelled;
+        else if (player)
+            playerDistanceTravelled = player.position.z;
     }
 
     private void HandleSegmentSpawned(GameObject segment)
@@ -117,11 +127,13 @@ public class ObstacleSpawner : MonoBehaviour
 
         float zOffset = Random.Range(0.2f * segmentLength, 0.8f * segmentLength);
         float spawnZ = segment.transform.position.z + zOffset;
+        float spawnDistance = GetRunDistance() + zOffset;
 
         float spacing = Mathf.Lerp(minGroupSpacing, maxGroupSpacing, difficultyFactor);
-        if (spawnZ - lastSpawnZ < spacing) return;
+        if (spawnDistance - lastSpawnDistance < spacing) return;
 
         lastSpawnZ = spawnZ;
+        lastSpawnDistance = spawnDistance;
         SpawnGroup(prefab, spawnZ, segment);
     }
 
@@ -142,15 +154,18 @@ public class ObstacleSpawner : MonoBehaviour
                 continue;
 
             float spawnZ = startZ + (i * minSpacingInsideCombo);
+            float spawnDistance = GetRunDistance() + (0.2f * segmentLength) + (i * minSpacingInsideCombo);
             int lane = sameLane ? baseLane : Random.Range(-1, 2);
 
             SpawnGroup(prefab, spawnZ, segment, lane);
             lastSpawnZ = spawnZ;
+            lastSpawnDistance = spawnDistance;
         }
     }
 
     private void SpawnGroup(GameObject prefab, float spawnZ, GameObject segment, int forcedLane = int.MinValue)
     {
+        float laneDistance = GetLaneDistance();
         float y = prefab.transform.position.y;
         ObstacleYOffset offset = prefab.GetComponent<ObstacleYOffset>();
         if (offset != null) y = offset.yOffset;
@@ -173,7 +188,7 @@ public class ObstacleSpawner : MonoBehaviour
         if (prefab.GetComponent<TwoLaneBlocker>())
         {
             int lane = (forcedLane != int.MinValue) ? forcedLane : ((Random.value < 0.5f) ? -1 : 1);
-            Vector3 pos = new Vector3(lane * 3f, y, spawnZ);
+            Vector3 pos = new Vector3(lane * laneDistance, y, spawnZ);
             ObjectPoolManager.Instance.SpawnFromPool(prefab.name, pos, rot, obstaclesRoot);
             Debug.Log($"🟠 Spawned TwoLane: {prefab.name} at {pos}");
             OnObstacleSpawned?.Invoke(segment, "TwoLane");
@@ -189,7 +204,7 @@ public class ObstacleSpawner : MonoBehaviour
 
             foreach (int lane in lanes)
             {
-                Vector3 pos = new Vector3(lane * 3f, y, spawnZ);
+                Vector3 pos = new Vector3(lane * laneDistance, y, spawnZ);
                 ObjectPoolManager.Instance.SpawnFromPool(prefab.name, pos, rot, obstaclesRoot);
             }
 
@@ -203,7 +218,7 @@ public class ObstacleSpawner : MonoBehaviour
                 if (fillerOffset != null) fy = fillerOffset.yOffset;
 
                 Quaternion fRot = filler.GetComponent<SlideObstacle>() ? filler.transform.rotation : Quaternion.identity;
-                Vector3 fillerPos = new Vector3(removedLane * 3f, fy, spawnZ);
+                Vector3 fillerPos = new Vector3(removedLane * laneDistance, fy, spawnZ);
                 ObjectPoolManager.Instance.SpawnFromPool(filler.name, fillerPos, fRot, obstaclesRoot);
 
                 Debug.Log($"🟠 Spawned OneLane filler: {filler.name} at {fillerPos}");
@@ -218,7 +233,7 @@ public class ObstacleSpawner : MonoBehaviour
 
             if (forcedLane != int.MinValue)
             {
-                Vector3 pos = new Vector3(forcedLane * 3f, y, spawnZ);
+                Vector3 pos = new Vector3(forcedLane * laneDistance, y, spawnZ);
                 ObjectPoolManager.Instance.SpawnFromPool(prefab.name, pos, rot, obstaclesRoot);
                 Debug.Log($"🟠 Spawned {type}: {prefab.name} at {pos}");
                 OnObstacleSpawned?.Invoke(segment, type);
@@ -227,7 +242,7 @@ public class ObstacleSpawner : MonoBehaviour
             {
                 for (int lane = -1; lane <= 1; lane++)
                 {
-                    Vector3 pos = new Vector3(lane * 3f, y, spawnZ);
+                    Vector3 pos = new Vector3(lane * laneDistance, y, spawnZ);
                     ObjectPoolManager.Instance.SpawnFromPool(prefab.name, pos, rot, obstaclesRoot);
                 }
                 Debug.Log($"🟠 Spawned Triplet {type}: {prefab.name} across all lanes at Z {spawnZ}");
@@ -267,6 +282,7 @@ public class ObstacleSpawner : MonoBehaviour
         activeConfig = egyptConfig;
         segmentCounter = 0;
         lastSpawnZ = -999f;
+        lastSpawnDistance = -999f;
 
         if (activeConfig == null)
         {
@@ -280,5 +296,30 @@ public class ObstacleSpawner : MonoBehaviour
                       $"{activeConfig.avoidLaneObstacles?.Length ?? 0} avoid, " +
                       $"{activeConfig.fullLaneObstacles?.Length ?? 0} full.");
         }
+    }
+
+    private float GetLaneDistance()
+    {
+        if (playerMovement != null)
+            return Mathf.Max(0.1f, playerMovement.LaneDistanceValue);
+
+        if (PlayerMovement.Instance != null)
+            return Mathf.Max(0.1f, PlayerMovement.Instance.LaneDistanceValue);
+
+        return 5f;
+    }
+
+    private float GetRunDistance()
+    {
+        if (WorldScrollController.Instance != null)
+            return WorldScrollController.Instance.DistanceTravelled;
+        return player != null ? player.position.z : 0f;
+    }
+
+    private void TryRegisterRoot()
+    {
+        if (rootRegistered || obstaclesRoot == null || WorldScrollController.Instance == null) return;
+        WorldScrollController.Instance.RegisterScrollRoot(obstaclesRoot);
+        rootRegistered = true;
     }
 }

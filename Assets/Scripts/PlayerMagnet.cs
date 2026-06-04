@@ -4,8 +4,12 @@ using System.Collections;
 public class PlayerMagnet : MonoBehaviour
 {
     [Header("Magnet Settings")]
-    public float magnetRadius = 5f;
+    public float magnetRadius = 10f;
     public float magnetForce = 15f;
+    [SerializeField] private float forwardCaptureDistance = 25f;
+    [SerializeField] private float behindCaptureDistance = 4f;
+    [SerializeField] private float extraLaneCapturePadding = 2.5f;
+    [SerializeField] private Vector3 attractionPointOffset = new Vector3(0f, 1f, 0f);
 
     [Header("Visuals & UI")]
     public GameObject magnetVFX;
@@ -43,18 +47,23 @@ public class PlayerMagnet : MonoBehaviour
         {
             // Find all active coins by tag instead of relying on Layer
             GameObject[] coins = GameObject.FindGameObjectsWithTag("Coin");
+            float laneDistance = PlayerMovement.Instance != null ? PlayerMovement.Instance.LaneDistanceValue : 5f;
+            float horizontalCapture = laneDistance + extraLaneCapturePadding;
+            Vector3 attractionPoint = transform.position + attractionPointOffset;
 
             foreach (GameObject coin in coins)
             {
                 if (coin == null || !coin.activeInHierarchy) continue;
 
-                float dist = Vector3.Distance(transform.position, coin.transform.position);
-                if (dist <= magnetRadius)
-                {
-                    Vector3 dir = (transform.position - coin.transform.position).normalized;
-                    float step = magnetForce * Time.deltaTime;
+                Vector3 delta = coin.transform.position - transform.position;
+                bool insideLaneWindow = Mathf.Abs(delta.x) <= horizontalCapture;
+                bool insideForwardWindow = delta.z <= forwardCaptureDistance && delta.z >= -behindCaptureDistance;
+                float dist = delta.magnitude;
 
-                    coin.transform.position = Vector3.MoveTowards(coin.transform.position, transform.position, step);
+                if ((insideLaneWindow && insideForwardWindow) || dist <= magnetRadius)
+                {
+                    float step = magnetForce * Time.deltaTime;
+                    coin.transform.position = Vector3.MoveTowards(coin.transform.position, attractionPoint, step);
                 }
             }
 

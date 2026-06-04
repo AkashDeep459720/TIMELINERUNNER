@@ -25,6 +25,8 @@ public class PowerupSpawner : MonoBehaviour
     public bool forceAll;
 
     private float lastSpawnZ = -999f;
+    private float lastSpawnDistance = -999f;
+    private bool rootRegistered;
 
     private void Start()
     {
@@ -34,6 +36,8 @@ public class PowerupSpawner : MonoBehaviour
             GameObject root = new GameObject("PowerupsRoot");
             powerupsRoot = root.transform;
         }
+
+        TryRegisterRoot();
 
         SegmentLoopGenerator.OnSegmentSpawned += HandleSegmentSpawned;
     }
@@ -45,10 +49,12 @@ public class PowerupSpawner : MonoBehaviour
 
     private void HandleSegmentSpawned(GameObject segment)
     {
+        TryRegisterRoot();
         float segZ = segment.transform.position.z;
+        float runDistance = GetRunDistance();
 
         // spacing check
-        if (segZ - lastSpawnZ < minGroupSpacing) return;
+        if (runDistance - lastSpawnDistance < minGroupSpacing) return;
 
         // debug overrides
         if (forceAll) { SpawnAll(segZ); return; }
@@ -77,14 +83,17 @@ public class PowerupSpawner : MonoBehaviour
     private void SpawnSingle(GameObject prefab, float z)
     {
         if (!prefab) return;
+        float laneDistance = GetLaneDistance();
         int lane = Random.Range(-1, 2); // -1,0,1
-        Vector3 pos = new Vector3(lane * 3f, prefab.transform.position.y, z + 10f);
+        Vector3 pos = new Vector3(lane * laneDistance, prefab.transform.position.y, z + 10f);
         ObjectPoolManager.Instance.SpawnFromPool(prefab.name, pos, Quaternion.identity, powerupsRoot);
         lastSpawnZ = z;
+        lastSpawnDistance = GetRunDistance();
     }
 
     private void SpawnPair(float z)
     {
+        float laneDistance = GetLaneDistance();
         List<GameObject> pool = new List<GameObject> { magnetPrefab, shieldPrefab, speedPrefab };
         pool.RemoveAt(Random.Range(0, pool.Count)); // remove one
 
@@ -92,24 +101,50 @@ public class PowerupSpawner : MonoBehaviour
         foreach (var prefab in pool)
         {
             if (!prefab) continue;
-            Vector3 pos = new Vector3(laneIndex * 3f, prefab.transform.position.y, z + 10f);
+            Vector3 pos = new Vector3(laneIndex * laneDistance, prefab.transform.position.y, z + 10f);
             ObjectPoolManager.Instance.SpawnFromPool(prefab.name, pos, Quaternion.identity, powerupsRoot);
             laneIndex += 2; // -1 → +1
         }
         lastSpawnZ = z;
+        lastSpawnDistance = GetRunDistance();
     }
 
     private void SpawnAll(float z)
     {
+        float laneDistance = GetLaneDistance();
         GameObject[] all = { magnetPrefab, shieldPrefab, speedPrefab };
         int[] lanes = { -1, 0, 1 };
 
         for (int i = 0; i < all.Length; i++)
         {
             if (!all[i]) continue;
-            Vector3 pos = new Vector3(lanes[i] * 3f, all[i].transform.position.y, z + 10f);
+            Vector3 pos = new Vector3(lanes[i] * laneDistance, all[i].transform.position.y, z + 10f);
             ObjectPoolManager.Instance.SpawnFromPool(all[i].name, pos, Quaternion.identity, powerupsRoot);
         }
         lastSpawnZ = z;
+        lastSpawnDistance = GetRunDistance();
+    }
+
+    private float GetLaneDistance()
+    {
+        if (PlayerMovement.Instance != null)
+            return Mathf.Max(0.1f, PlayerMovement.Instance.LaneDistanceValue);
+        return 5f;
+    }
+
+    private void TryRegisterRoot()
+    {
+        if (rootRegistered || powerupsRoot == null || WorldScrollController.Instance == null) return;
+        WorldScrollController.Instance.RegisterScrollRoot(powerupsRoot);
+        rootRegistered = true;
+    }
+
+    private float GetRunDistance()
+    {
+        if (WorldScrollController.Instance != null)
+            return WorldScrollController.Instance.DistanceTravelled;
+        if (PlayerMovement.Instance != null)
+            return PlayerMovement.Instance.transform.position.z;
+        return 0f;
     }
 }

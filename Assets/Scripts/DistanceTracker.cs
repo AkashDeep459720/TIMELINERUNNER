@@ -17,10 +17,12 @@ public class DistanceTracker : MonoBehaviour
 
     void Update()
     {
-        if (player == null) return;
-
-        // measure distance as Z position of player
-        currentDistance = Mathf.RoundToInt(player.position.z);
+        if (WorldScrollController.Instance != null)
+            currentDistance = Mathf.RoundToInt(WorldScrollController.Instance.DistanceTravelled);
+        else if (player != null)
+            currentDistance = Mathf.RoundToInt(player.position.z);
+        else
+            currentDistance = 0;
 
         // update UI text
         if (distanceText)

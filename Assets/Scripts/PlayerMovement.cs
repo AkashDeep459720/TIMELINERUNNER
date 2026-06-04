@@ -3,11 +3,17 @@ using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
+    public static PlayerMovement Instance { get; private set; }
+
     [Header("Movement Settings")]
     public float playerSpeed = 8f;
     public float slideSpeedMultiplier = 0.8f;
-    public float laneDistance = 3f;
+    public float laneDistance = 5f;
     public float laneSwitchSpeed = 14f;
+
+    [Header("Forward Motion Model")]
+    [SerializeField] private bool lockForwardToStartZ = true;
+    [SerializeField] private bool driveAnimatorFromWorldScroll = true;
 
     [Header("Immersion Settings")]
     public float tiltAngle = 15f;
@@ -43,7 +49,7 @@ public class PlayerMovement : MonoBehaviour
     public float boostMultiplier = 1.5f;
     public float boostDuration = 5f;
 
-    [Header("Difficulty Scaling")]
+    [Header("Difficulty Scaling (fallback if no WorldScrollController)")]
     public float speedIncreaseAmount = 0.2f;
     public float speedIncreaseInterval = 30f;
     private float nextSpeedIncreaseTime = 0f;
@@ -103,6 +109,7 @@ public class PlayerMovement : MonoBehaviour
     private float _lastSlideRequestTime = -999f;
 
     private bool isReviving = false;
+    private float lockedForwardZ;
 
     // Mobile-specific ground tracking
     private float confirmedGroundY;
@@ -110,6 +117,11 @@ public class PlayerMovement : MonoBehaviour
 
     // NEW: skip ground checks for a few frames after portal teleport
     private int suppressGroundChecks = 0;
+
+    private void Awake()
+    {
+        Instance = this;
+    }
 
     void Start()
     {
@@ -123,10 +135,14 @@ public class PlayerMovement : MonoBehaviour
 
         originalSpeed = playerSpeed;
         Application.targetFrameRate = 60;
+        lockedForwardZ = transform.position.z;
 
         InitializeGroundPosition();
 
         nextSpeedIncreaseTime = Time.timeSinceLevelLoad + speedIncreaseInterval;
+
+        if (WorldScrollController.Instance != null)
+            WorldScrollController.Instance.ConfigureBaseScrollSpeed(playerSpeed);
     }
 
     void InitializeGroundPosition()
@@ -182,7 +198,6 @@ public class PlayerMovement : MonoBehaviour
         }
 
         float moveSpeed = CurrentForwardSpeed();
-        transform.Translate(Vector3.forward * moveSpeed * Time.deltaTime, Space.World);
 
 #if UNITY_EDITOR || UNITY_STANDALONE
         if (Input.GetKeyDown(KeyCode.A) && currentLane > -1) { currentLane--; StartTilt(-1); }
@@ -197,7 +212,8 @@ public class PlayerMovement : MonoBehaviour
 
         float targetX = currentLane * laneDistance;
         float newX = Mathf.MoveTowards(transform.position.x, targetX, laneSwitchSpeed * Time.deltaTime);
-        transform.position = new Vector3(newX, transform.position.y, transform.position.z);
+        float targetZ = lockForwardToStartZ ? lockedForwardZ : transform.position.z;
+        transform.position = new Vector3(newX, transform.position.y, targetZ);
 
         currentTilt = Mathf.Lerp(currentTilt, targetTilt, Time.deltaTime * tiltLerpSpeed);
         transform.rotation = Quaternion.Euler(0f, 0f, currentTilt);
@@ -209,7 +225,7 @@ public class PlayerMovement : MonoBehaviour
 
         SyncAnimator(moveSpeed);
 
-        if (Time.timeSinceLevelLoad >= nextSpeedIncreaseTime)
+        if (WorldScrollController.Instance == null && Time.timeSinceLevelLoad >= nextSpeedIncreaseTime)
         {
             playerSpeed += speedIncreaseAmount;
             nextSpeedIncreaseTime = Time.timeSinceLevelLoad + speedIncreaseInterval;
@@ -470,10 +486,10 @@ public class PlayerMovement : MonoBehaviour
     IEnumerator SpeedBoostRoutine()
     {
         isBoosted = true;
-        float pre = playerSpeed;
-        playerSpeed = pre * boostMultiplier;
+        if (WorldScrollController.Instance != null)
+            WorldScrollController.Instance.ActivateSpeedBoost(boostMultiplier, boostDuration);
+
         yield return new WaitForSeconds(boostDuration);
-        playerSpeed = pre;
         isBoosted = false;
     }
 
@@ -481,6 +497,9 @@ public class PlayerMovement : MonoBehaviour
     float CurrentForwardSpeed()
     {
         float s = playerSpeed;
+        if (driveAnimatorFromWorldScroll && WorldScrollController.Instance != null)
+            s = WorldScrollController.Instance.CurrentScrollSpeed;
+
         if (isSliding) s *= slideSpeedMultiplier;
         return s;
     }
@@ -622,11 +641,8 @@ public class PlayerMovement : MonoBehaviour
         confirmedGroundY = targetGroundY;
         hasValidGroundY = true;
 
-        Vector3 finalPosition = new Vector3(
-            revivePosition.x,
-            revivePosition.y,
-            revivePosition.z + 2f
-        );
+        float reviveZ = lockForwardToStartZ ? lockedForwardZ : revivePosition.z + 2f;
+        Vector3 finalPosition = new Vector3(revivePosition.x, revivePosition.y, reviveZ);
 
         transform.position = finalPosition;
 
@@ -640,5 +656,13 @@ public class PlayerMovement : MonoBehaviour
 
         isFrozen = false;
         isReviving = false;
+    }
+
+    public float LaneDistanceValue => laneDistance;
+    public float GetLaneX(int laneIndex) => laneIndex * laneDistance;
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
     }
 }

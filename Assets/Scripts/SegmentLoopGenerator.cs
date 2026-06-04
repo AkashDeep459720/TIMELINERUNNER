@@ -37,9 +37,25 @@ public class SegmentLoopGenerator : MonoBehaviour
     [Header("Player / Timeline")]
     public Transform player;
     public int maxSegments = 6;
+    [SerializeField] private float recycleBehindPlayerDistance = 60f;
 
     [Header("Egypt Landing (optional)")]
     public Transform egyptLandingPoint;
+
+    [Header("World Roots")]
+    [SerializeField] private Transform segmentsRoot;
+    [SerializeField] private Transform portalsRoot;
+
+    [Header("Portal Grounding")]
+    [SerializeField] private float portalBaseYOffset = 1.93f;
+    [SerializeField] private LayerMask groundSnapMask = ~0;
+    [SerializeField] private float groundSnapRayHeight = 6f;
+    [SerializeField] private float groundSnapRayDistance = 18f;
+
+    [Header("Egypt Alignment")]
+    [SerializeField] private bool autoAlignEgyptSegments = true;
+    [SerializeField] private float egyptLaneCenterX = 0f;
+    [SerializeField] private float maxEgyptCenterCorrection = 8f;
 
     // ----- internals -----
     private float zSpawn = 0f;
@@ -47,7 +63,7 @@ public class SegmentLoopGenerator : MonoBehaviour
     private readonly List<GameObject> activeSegments = new List<GameObject>();
 
     private bool inEgyptTimeline = false;
-    private float lastPortalZ = -99999f;
+    private float lastPortalDistance = -99999f;
 
     private bool portalQueued = false;
     private bool portalSpawned = false;
@@ -55,6 +71,7 @@ public class SegmentLoopGenerator : MonoBehaviour
     private float queuedTime = -1f;
 
     private bool egyptRunwaySpawned = false;
+    private bool rootsRegistered = false;
 
     // -------------- Lifecycle --------------
     private void OnEnable()
@@ -65,6 +82,8 @@ public class SegmentLoopGenerator : MonoBehaviour
     private void Start()
     {
         Application.targetFrameRate = 60;
+        EnsureRoots();
+        RegisterRootsWithScrollController();
 
         // Boot runway
         for (int i = 0; i < maxSegments; i++)
@@ -90,10 +109,11 @@ public class SegmentLoopGenerator : MonoBehaviour
     private void Update()
     {
         if (GameState.IsPaused) return;
+        if (!rootsRegistered) RegisterRootsWithScrollController();
         if (player == null || activeSegments.Count == 0) return;
 
         // recycle head segment
-        if (player.position.z - 60f > activeSegments[0].transform.position.z)
+        if (activeSegments[0].transform.position.z < player.position.z - recycleBehindPlayerDistance)
         {
             var pool = GetCurrentPool();
             if (pool != null && pool.Length > 0)
@@ -148,7 +168,14 @@ public class SegmentLoopGenerator : MonoBehaviour
     {
         if (prefab == null) return;
 
-        GameObject segment = Instantiate(prefab, Vector3.forward * zSpawn, Quaternion.identity);
+        EnsureRoots();
+        GameObject segment = Instantiate(prefab, segmentsRoot);
+        segment.transform.localPosition = new Vector3(0f, 0f, zSpawn);
+        segment.transform.localRotation = Quaternion.identity;
+
+        if (inEgyptTimeline && autoAlignEgyptSegments)
+            AlignEgyptSegment(segment);
+
         activeSegments.Add(segment);
 
         // 🔔 Notify listeners (ObstacleSpawner etc.)
@@ -206,8 +233,8 @@ public class SegmentLoopGenerator : MonoBehaviour
     {
         if (portalSpawned) return false;
 
-        float segmentFrontZ = segment.transform.position.z + segmentLength * 0.5f;
-        if (segmentFrontZ - lastPortalZ < minPortalSpacing)
+        float currentDistance = GetRunDistance();
+        if (currentDistance - lastPortalDistance < minPortalSpacing)
         {
             return false;
         }
@@ -231,6 +258,7 @@ public class SegmentLoopGenerator : MonoBehaviour
             worldRot = socket.rotation;
         }
 
+        worldPos = ResolvePortalGroundedPosition(worldPos);
         if (Blocked(worldPos)) return false;
 
         Quaternion finalRot = worldRot * Quaternion.Euler(portalEulerOffset);
@@ -268,6 +296,7 @@ public class SegmentLoopGenerator : MonoBehaviour
         float x = emergencyAlignToPlayerX ? player.position.x : 0f;
 
         Vector3 pos = new Vector3(x, groundY, z);
+        pos = ResolvePortalGroundedPosition(pos);
         Quaternion rot = Quaternion.LookRotation(Vector3.forward, Vector3.up) * Quaternion.Euler(portalEulerOffset);
 
         SpawnPortal(pos, rot);
@@ -286,7 +315,8 @@ public class SegmentLoopGenerator : MonoBehaviour
 
     private void SpawnPortal(Vector3 pos, Quaternion rot)
     {
-        var go = Instantiate(portalPrefab, pos, rot);
+        EnsureRoots();
+        var go = Instantiate(portalPrefab, pos, rot, portalsRoot);
 
         var trig = go.GetComponent<PortalTrigger>();
         if (trig != null && egyptLandingPoint != null)
@@ -294,13 +324,73 @@ public class SegmentLoopGenerator : MonoBehaviour
             trig.SetDestination(egyptLandingPoint);
         }
 
-        lastPortalZ = pos.z;
+        lastPortalDistance = GetRunDistance();
         portalSpawned = true;
         portalQueued = false;
         queuedTime = -1f;
         PortalEvents.OnPortalSpawned?.Invoke(pos);
 
         Debug.Log($"🌀 [Gen] Portal spawned at Z {pos.z}");
+    }
+
+    private void AlignEgyptSegment(GameObject segment)
+    {
+        Renderer[] renderers = segment.GetComponentsInChildren<Renderer>();
+        if (renderers == null || renderers.Length == 0) return;
+
+        Bounds b = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+            b.Encapsulate(renderers[i].bounds);
+
+        float correction = egyptLaneCenterX - b.center.x;
+        correction = Mathf.Clamp(correction, -maxEgyptCenterCorrection, maxEgyptCenterCorrection);
+        if (Mathf.Abs(correction) < 0.01f) return;
+
+        segment.transform.position += Vector3.right * correction;
+    }
+
+    private Vector3 ResolvePortalGroundedPosition(Vector3 worldPos)
+    {
+        Vector3 rayOrigin = worldPos + Vector3.up * groundSnapRayHeight;
+        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, groundSnapRayHeight + groundSnapRayDistance, groundSnapMask, QueryTriggerInteraction.Ignore))
+        {
+            worldPos.y = hit.point.y + portalBaseYOffset;
+            return worldPos;
+        }
+
+        worldPos.y += portalBaseYOffset;
+        return worldPos;
+    }
+
+    private float GetRunDistance()
+    {
+        if (WorldScrollController.Instance != null)
+            return WorldScrollController.Instance.DistanceTravelled;
+
+        return player != null ? player.position.z : 0f;
+    }
+
+    private void EnsureRoots()
+    {
+        if (segmentsRoot == null)
+        {
+            GameObject go = new GameObject("SegmentsRoot");
+            segmentsRoot = go.transform;
+        }
+
+        if (portalsRoot == null)
+        {
+            GameObject go = new GameObject("PortalsRoot");
+            portalsRoot = go.transform;
+        }
+    }
+
+    private void RegisterRootsWithScrollController()
+    {
+        if (WorldScrollController.Instance == null) return;
+        WorldScrollController.Instance.RegisterScrollRoot(segmentsRoot);
+        WorldScrollController.Instance.RegisterScrollRoot(portalsRoot);
+        rootsRegistered = true;
     }
 
     // --- helpers ---

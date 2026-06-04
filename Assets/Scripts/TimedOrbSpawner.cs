@@ -16,7 +16,7 @@ public class TimedOrbSpawner : MonoBehaviour
     public bool stopWhenOrbsCompleted = true;
 
     [Header("Placement / Track")]
-    public float laneWidth = 2.2f;
+    public float laneWidth = 5f;
     public float minAheadZ = 25f;
     public float maxAheadZ = 45f;
     public float rayStartHeight = 3.0f;
@@ -37,6 +37,8 @@ public class TimedOrbSpawner : MonoBehaviour
     public float despawnBehindDistance = 60f;
 
     private float timer;
+    private Transform orbsRoot;
+    private bool rootRegistered;
 
     private void OnEnable()
     {
@@ -53,6 +55,10 @@ public class TimedOrbSpawner : MonoBehaviour
 
     private void Start()
     {
+        EnsureRoot();
+        if (PlayerMovement.Instance != null)
+            laneWidth = PlayerMovement.Instance.LaneDistanceValue;
+
         if (spawnImmediatelyOnStart) timer = spawnIntervalSeconds;
 
         // If the run already completed (e.g., scene reload), stop right away.
@@ -65,6 +71,7 @@ public class TimedOrbSpawner : MonoBehaviour
 
     private void Update()
     {
+        TryRegisterRoot();
         if (!player || !orbPrefab) return;
 
         // Belt & suspenders: also guard in Update in case subscription was missed.
@@ -95,6 +102,7 @@ public class TimedOrbSpawner : MonoBehaviour
 
     private void TrySpawnOrbAhead()
     {
+        EnsureRoot();
         int[] lanes = new int[] { -1, 0, +1 };
         Shuffle(lanes);
 
@@ -121,13 +129,29 @@ public class TimedOrbSpawner : MonoBehaviour
 
                 Quaternion finalRot = baseRot * Quaternion.Euler(rotationEulerOffset);
 
-                GameObject orb = Instantiate(orbPrefab, spawnPos, finalRot);
+                GameObject orb = Instantiate(orbPrefab, spawnPos, finalRot, orbsRoot);
                 var sd = orb.AddComponent<SelfDestructBehindPlayer>();
                 sd.player = player;
                 sd.distance = despawnBehindDistance;
                 return;
             }
         }
+    }
+
+    private void EnsureRoot()
+    {
+        if (orbsRoot != null) return;
+
+        GameObject root = new GameObject("OrbsRoot");
+        orbsRoot = root.transform;
+        TryRegisterRoot();
+    }
+
+    private void TryRegisterRoot()
+    {
+        if (rootRegistered || orbsRoot == null || WorldScrollController.Instance == null) return;
+        WorldScrollController.Instance.RegisterScrollRoot(orbsRoot);
+        rootRegistered = true;
     }
 
     private void Shuffle(int[] a)
