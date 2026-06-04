@@ -20,6 +20,7 @@ public class CoinSpawner : MonoBehaviour
     public bool forceZigzag;
     public bool forceWave;
     public bool forceSlide;
+    private bool rootRegistered;
 
     private void Start()
     {
@@ -28,6 +29,8 @@ public class CoinSpawner : MonoBehaviour
             GameObject root = new GameObject("CoinsRoot");
             coinsRoot = root.transform;
         }
+
+        TryRegisterRoot();
 
         ObstacleSpawner.OnObstacleSpawned += HandleObstacleSpawned;
         SegmentLoopGenerator.OnSegmentSpawned += HandleSegmentSpawned;
@@ -61,6 +64,7 @@ public class CoinSpawner : MonoBehaviour
     // --- When a clean segment spawns (no obstacle event fired) ---
     private void HandleSegmentSpawned(GameObject segment)
     {
+        TryRegisterRoot();
         if (forceStraight) { SpawnStraight(segment); return; }
         if (forceZigzag) { SpawnZigzag(segment); return; }
         if (forceWave) { SpawnWave(segment); return; }
@@ -74,27 +78,30 @@ public class CoinSpawner : MonoBehaviour
     // ---------------- Patterns ----------------
     private void SpawnStraight(GameObject segment)
     {
+        float laneDistance = GetLaneDistance();
         int lane = Random.Range(-1, 2);
         float startZ = segment.transform.position.z + 10f;
 
         for (int i = 0; i < straightCount; i++)
-            SpawnCoin(new Vector3(lane * 3f, coinGroundY, startZ + (i * 2f)));
+            SpawnCoin(new Vector3(lane * laneDistance, coinGroundY, startZ + (i * 2f)));
     }
 
     private void SpawnZigzag(GameObject segment)
     {
+        float laneDistance = GetLaneDistance();
         float startZ = segment.transform.position.z + 10f;
         int[] lanes = { -1, 0, 1, 0 };
 
         for (int i = 0; i < zigzagCount; i++)
         {
             int lane = lanes[i % lanes.Length];
-            SpawnCoin(new Vector3(lane * 3f, coinGroundY, startZ + (i * 2f)));
+            SpawnCoin(new Vector3(lane * laneDistance, coinGroundY, startZ + (i * 2f)));
         }
     }
 
     private void SpawnWave(GameObject segment)
     {
+        float laneDistance = GetLaneDistance();
         int lane = 0;
         float startZ = segment.transform.position.z + 10f;
 
@@ -102,7 +109,7 @@ public class CoinSpawner : MonoBehaviour
         {
             float t = (float)i / (waveCount - 1);
             float y = Mathf.Lerp(coinGroundY, wavePeakY, Mathf.Sin(t * Mathf.PI));
-            SpawnCoin(new Vector3(lane * 3f, y, startZ + (i * 2f)));
+            SpawnCoin(new Vector3(lane * laneDistance, y, startZ + (i * 2f)));
         }
     }
 
@@ -119,5 +126,19 @@ public class CoinSpawner : MonoBehaviour
         if (!coinPrefab) return;
         Quaternion rot = Quaternion.Euler(90f, 0f, 0f); // upright
         ObjectPoolManager.Instance.SpawnFromPool(coinPrefab.name, pos, rot, coinsRoot);
+    }
+
+    private float GetLaneDistance()
+    {
+        if (PlayerMovement.Instance != null)
+            return Mathf.Max(0.1f, PlayerMovement.Instance.LaneDistanceValue);
+        return 5f;
+    }
+
+    private void TryRegisterRoot()
+    {
+        if (rootRegistered || coinsRoot == null || WorldScrollController.Instance == null) return;
+        WorldScrollController.Instance.RegisterScrollRoot(coinsRoot);
+        rootRegistered = true;
     }
 }

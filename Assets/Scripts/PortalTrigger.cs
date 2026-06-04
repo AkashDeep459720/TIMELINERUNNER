@@ -12,6 +12,7 @@ public class PortalTrigger : MonoBehaviour
 
     [Header("Landing")]
     [SerializeField] private Transform egyptLandingPoint;
+    [SerializeField] private bool snapLandingToLane = true;
 
     [Header("Animator Triggers (optional)")]
     [SerializeField] private string enterPortalTrigger = "EnterPortal";
@@ -27,6 +28,7 @@ public class PortalTrigger : MonoBehaviour
     [SerializeField] private float raycastDown = 10.0f;
     [SerializeField] private float extraFootOffset = 0.01f;
     [SerializeField] private float fallbackY = 0.0f;
+    [SerializeField] private float keepPlayerForwardZOffset = 0f;
 
     private bool triggered;
     private Collider myTrigger;
@@ -89,6 +91,8 @@ public class PortalTrigger : MonoBehaviour
     {
         // 1) Pause movement & play enter anim
         if (playerMovement) playerMovement.enabled = false;
+        if (WorldScrollController.Instance != null)
+            WorldScrollController.Instance.SetScrollPaused(true);
 
         if (playerAnimator)
         {
@@ -113,13 +117,18 @@ public class PortalTrigger : MonoBehaviour
         // 3) Teleport with ground snap
         if (player)
         {
-            float landingZ = player.position.z;
-            if (segmentGenerator != null)
-                landingZ = segmentGenerator.GetCurrentZSpawn() - 100f;
+            float landingZ = player.position.z + keepPlayerForwardZOffset;
 
             Vector3 target = egyptLandingPoint
                 ? egyptLandingPoint.position
                 : new Vector3(0f, fallbackY, landingZ);
+
+            if (snapLandingToLane && playerMovement != null)
+            {
+                float laneDistance = Mathf.Max(0.1f, playerMovement.LaneDistanceValue);
+                float snappedX = Mathf.Round(target.x / laneDistance) * laneDistance;
+                target.x = snappedX;
+            }
 
             // Raycast from WELL ABOVE the target to ensure we hit valid ground
             float yFinal = target.y;
@@ -169,6 +178,8 @@ public class PortalTrigger : MonoBehaviour
         if (afterLandingDelay > 0f) yield return new WaitForSeconds(afterLandingDelay);
 
         if (playerMovement) playerMovement.enabled = true;
+        if (WorldScrollController.Instance != null)
+            WorldScrollController.Instance.SetScrollPaused(false);
 
         // disable portal and release guard
         gameObject.SetActive(false);
@@ -176,4 +187,10 @@ public class PortalTrigger : MonoBehaviour
     }
 
     public void SetDestination(Transform dest) => egyptLandingPoint = dest;
+
+    private void OnDisable()
+    {
+        if (teleporting && WorldScrollController.Instance != null)
+            WorldScrollController.Instance.SetScrollPaused(false);
+    }
 }

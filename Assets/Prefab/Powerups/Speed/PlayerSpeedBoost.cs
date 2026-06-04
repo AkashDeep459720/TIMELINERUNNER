@@ -8,7 +8,8 @@ public class PlayerSpeedBoost : MonoBehaviour
     public float defaultDuration = 5f;
 
     [Header("Refs")]
-    public PlayerMovement player;   // drag your PlayerMovement
+    public PlayerMovement player;   // optional legacy reference
+    public WorldScrollController scrollController;
     public SpeedBarUI speedBar;     // drag SpeedBarUI (Step 1)
     public GameObject speedVFX;     // optional trail/glow
 
@@ -20,6 +21,7 @@ public class PlayerSpeedBoost : MonoBehaviour
     void Awake()
     {
         if (!player) player = FindFirstObjectByType<PlayerMovement>();
+        if (!scrollController) scrollController = FindFirstObjectByType<WorldScrollController>();
     }
 
     void Start()
@@ -49,8 +51,9 @@ public class PlayerSpeedBoost : MonoBehaviour
         active = true;
         remaining = duration;
 
-        baseSpeed = player ? player.playerSpeed : 0f;
-        if (player) player.playerSpeed = baseSpeed * speedMultiplier;
+        if (!scrollController) scrollController = WorldScrollController.Instance;
+        baseSpeed = scrollController ? scrollController.CurrentScrollSpeed : 0f;
+        if (scrollController) scrollController.ActivateSpeedBoost(speedMultiplier, remaining);
 
         if (speedVFX) speedVFX.SetActive(true);
         if (speedBar) speedBar.StartTimer(remaining);
@@ -58,11 +61,11 @@ public class PlayerSpeedBoost : MonoBehaviour
         while (remaining > 0f)
         {
             remaining -= Time.deltaTime;
+            if (scrollController)
+                scrollController.ActivateSpeedBoost(speedMultiplier, Mathf.Max(remaining, 0.01f));
             yield return null;
         }
 
-        // restore
-        if (player) player.playerSpeed = baseSpeed;
         if (speedVFX) speedVFX.SetActive(false);
         if (speedBar) speedBar.StopTimer();
 
@@ -75,7 +78,6 @@ public class PlayerSpeedBoost : MonoBehaviour
         // safety: restore if object is disabled mid-boost
         if (active)
         {
-            if (player) player.playerSpeed = baseSpeed;
             if (speedVFX) speedVFX.SetActive(false);
             if (speedBar) speedBar.StopTimer();
             if (co != null) StopCoroutine(co);
