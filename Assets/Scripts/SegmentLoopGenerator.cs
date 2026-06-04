@@ -60,6 +60,11 @@ public class SegmentLoopGenerator : MonoBehaviour
     [SerializeField] private float egyptLaneCenterX = 0f;
     [SerializeField] private float maxEgyptCenterCorrection = 8f;
 
+    [Header("Egypt Tile Spacing")]
+    [SerializeField] private bool useEgyptTileSpacing = true;
+    [SerializeField] private float egyptTileSpacingPositive = 3f;
+    [SerializeField] private float egyptTileSpacingNegative = -3f;
+
     // ----- internals -----
     private float zSpawn = 0f;
     private const float segmentLength = 50f;
@@ -74,6 +79,7 @@ public class SegmentLoopGenerator : MonoBehaviour
     private float queuedTime = -1f;
 
     private bool egyptRunwaySpawned = false;
+    private int egyptTileSpawnIndex = 0;
     private bool rootsRegistered = false;
 
     // -------------- Lifecycle --------------
@@ -173,11 +179,21 @@ public class SegmentLoopGenerator : MonoBehaviour
 
         EnsureRoots();
         GameObject segment = Instantiate(prefab, segmentsRoot);
-        segment.transform.localPosition = new Vector3(0f, 0f, zSpawn);
+
+        float spawnX = 0f;
+        if (inEgyptTimeline && useEgyptTileSpacing)
+            spawnX = (egyptTileSpawnIndex % 2 == 0) ? egyptTileSpacingPositive : egyptTileSpacingNegative;
+
+        segment.transform.localPosition = new Vector3(spawnX, 0f, zSpawn);
         segment.transform.localRotation = Quaternion.identity;
 
-        if (inEgyptTimeline && autoAlignEgyptSegments)
-            AlignEgyptSegment(segment);
+        if (inEgyptTimeline)
+        {
+            if (useEgyptTileSpacing)
+                egyptTileSpawnIndex++;
+            else if (autoAlignEgyptSegments)
+                AlignEgyptSegment(segment);
+        }
 
         activeSegments.Add(segment);
 
@@ -200,7 +216,10 @@ public class SegmentLoopGenerator : MonoBehaviour
     public void SwitchToEgyptTimeline()
     {
         if (!inEgyptTimeline)
+        {
             inEgyptTimeline = true;
+            egyptTileSpawnIndex = 0;
+        }
     }
 
     public void ResetZ(float newStartZ)
@@ -244,6 +263,7 @@ public class SegmentLoopGenerator : MonoBehaviour
         zSpawn = playerWorldZ - rootZ;
 
         egyptRunwaySpawned = false;
+        egyptTileSpawnIndex = 0;
 
         GameObject[] pool = egyptSegments;
         if (pool == null || pool.Length == 0) return;

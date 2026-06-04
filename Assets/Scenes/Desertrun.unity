@@ -5146,6 +5146,9 @@ MonoBehaviour:
   autoAlignEgyptSegments: 1
   egyptLaneCenterX: 0
   maxEgyptCenterCorrection: 8
+  useEgyptTileSpacing: 1
+  egyptTileSpacingPositive: 3
+  egyptTileSpacingNegative: -3
 --- !u!4 &2129219446
 Transform:
   m_ObjectHideFlags: 0
