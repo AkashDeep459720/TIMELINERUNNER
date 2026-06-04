@@ -74,6 +74,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 599fadc475f839b45bea85eed81cea46, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7156942064450243971}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 599fadc475f839b45bea85eed81cea46, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8822334455667788991}
   m_SourcePrefab: {fileID: 100100000, guid: 599fadc475f839b45bea85eed81cea46, type: 3}
 --- !u!1 &1516699400450267269 stripped
 GameObject:
@@ -92,11 +95,35 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 13f0b9eb04ff92a4d83d3472aadcc47e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerAnimator: {fileID: 0}
+  player: {fileID: 0}
   playerMovement: {fileID: 0}
+  playerAnimator: {fileID: 0}
   segmentGenerator: {fileID: 0}
-  egyptLandingPoint: {fileID: 0}
-  teleportOffsetZ: 10
+  enterPortalTrigger: EnterPortal
+  landInEgyptTrigger: LandInEgypt
+  enterPortalDelay: 1
+  fadeOutDuration: 0.35
+  fadeInDuration: 0.35
+  afterLandingDelay: 0.4
+  fadeController: {fileID: 0}
+--- !u!114 &8822334455667788991
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1516699400450267269}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 717ad365473448a79a98da620967fb46, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  portalBaseYOffset: 1.93
+  groundSnapMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundSnapRayHeight: 6
+  groundSnapRayDistance: 18
 --- !u!65 &7156942064450243971
 BoxCollider:
   m_ObjectHideFlags: 0

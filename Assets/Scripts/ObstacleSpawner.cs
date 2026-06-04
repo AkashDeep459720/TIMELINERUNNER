@@ -54,13 +54,13 @@ public class ObstacleSpawner : MonoBehaviour
         activeConfig = robotConfig;
 
         SegmentLoopGenerator.OnSegmentSpawned += HandleSegmentSpawned;
-        PortalEvents.OnPortalSpawned += HandlePortalSwap;
+        PortalEvents.OnEgyptTimelineEntered += HandleEgyptTimelineSwap;
     }
 
     void OnDestroy()
     {
         SegmentLoopGenerator.OnSegmentSpawned -= HandleSegmentSpawned;
-        PortalEvents.OnPortalSpawned -= HandlePortalSwap;
+        PortalEvents.OnEgyptTimelineEntered -= HandleEgyptTimelineSwap;
     }
 
     void Update()
@@ -314,7 +314,7 @@ public class ObstacleSpawner : MonoBehaviour
         return pool[Random.Range(0, pool.Count)];
     }
 
-    private void HandlePortalSwap(Vector3 pos)
+    private void HandleEgyptTimelineSwap()
     {
         foreach (Transform child in obstaclesRoot)
             child.gameObject.SetActive(false);

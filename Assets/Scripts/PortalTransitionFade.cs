@@ -46,6 +46,7 @@ public class PortalTransitionFade : MonoBehaviour
         }
 
         GameObject go = new GameObject("PortalTransitionFade");
+        ApplyRuntimeHideFlags(go);
         Instance = go.AddComponent<PortalTransitionFade>();
         return Instance;
     }
@@ -106,6 +107,15 @@ public class PortalTransitionFade : MonoBehaviour
             gameObject.AddComponent<CanvasScaler>();
             gameObject.AddComponent<GraphicRaycaster>();
         }
+    }
+
+    private static void ApplyRuntimeHideFlags(GameObject go)
+    {
+#if UNITY_EDITOR
+        go.hideFlags = HideFlags.DontSaveInEditor | HideFlags.HideInHierarchy;
+#else
+        go.hideFlags = HideFlags.DontSave;
+#endif
     }
 
     private void OnDestroy()

@@ -127,7 +127,7 @@ public class PortalTrigger : MonoBehaviour
         else if (segmentGenerator != null)
         {
             segmentGenerator.SwitchToEgyptTimeline();
-            segmentGenerator.ForceSpawnEgyptSegments(3);
+            segmentGenerator.ForceSpawnEgyptSegments(segmentGenerator.EgyptRunwayBurstCount);
         }
 
         SnapPlayerGroundIfNeeded();
