@@ -95,11 +95,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 13f0b9eb04ff92a4d83d3472aadcc47e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerAnimator: {fileID: 0}
+  player: {fileID: 0}
   playerMovement: {fileID: 0}
+  playerAnimator: {fileID: 0}
   segmentGenerator: {fileID: 0}
-  egyptLandingPoint: {fileID: 0}
-  teleportOffsetZ: 10
+  enterPortalTrigger: EnterPortal
+  landInEgyptTrigger: LandInEgypt
+  enterPortalDelay: 1
+  fadeOutDuration: 0.35
+  fadeInDuration: 0.35
+  afterLandingDelay: 0.4
+  fadeController: {fileID: 0}
 --- !u!114 &8822334455667788991
 MonoBehaviour:
   m_ObjectHideFlags: 0

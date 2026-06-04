@@ -55,6 +55,11 @@ public class WorldScrollController : MonoBehaviour
         }
 
         GameObject go = new GameObject("WorldScrollController");
+#if UNITY_EDITOR
+        go.hideFlags = HideFlags.DontSaveInEditor | HideFlags.HideInHierarchy;
+#else
+        go.hideFlags = HideFlags.DontSave;
+#endif
         go.AddComponent<WorldScrollController>();
     }
 

@@ -81,6 +81,8 @@ public class SegmentLoopGenerator : MonoBehaviour
     private bool egyptRunwaySpawned = false;
     private int egyptTileSpawnIndex = 0;
     private bool rootsRegistered = false;
+    private bool createdSegmentsRoot;
+    private bool createdPortalsRoot;
 
     // -------------- Lifecycle --------------
     private void OnEnable()
@@ -159,6 +161,12 @@ public class SegmentLoopGenerator : MonoBehaviour
             OrbManager.Instance.OnTargetReached -= QueuePortal;
             subscribed = false;
         }
+    }
+
+    private void OnDestroy()
+    {
+        ClearActiveSegments();
+        DestroyRuntimeRootsIfCreated();
     }
 
     private void QueuePortal()
@@ -286,11 +294,40 @@ public class SegmentLoopGenerator : MonoBehaviour
     {
         for (int i = activeSegments.Count - 1; i >= 0; i--)
         {
-            if (activeSegments[i] != null)
+            if (activeSegments[i] == null) continue;
+
+            if (Application.isPlaying)
                 Destroy(activeSegments[i]);
+#if UNITY_EDITOR
+            else
+                DestroyImmediate(activeSegments[i]);
+#endif
         }
 
         activeSegments.Clear();
+    }
+
+    private void DestroyRuntimeRootsIfCreated()
+    {
+#if UNITY_EDITOR
+        if (createdSegmentsRoot && segmentsRoot != null)
+            DestroyImmediate(segmentsRoot.gameObject);
+        if (createdPortalsRoot && portalsRoot != null)
+            DestroyImmediate(portalsRoot.gameObject);
+        createdSegmentsRoot = false;
+        createdPortalsRoot = false;
+        segmentsRoot = null;
+        portalsRoot = null;
+#endif
+    }
+
+    private static void MarkAsRuntimeRoot(GameObject go)
+    {
+#if UNITY_EDITOR
+        go.hideFlags = HideFlags.DontSaveInEditor | HideFlags.HideInHierarchy;
+#else
+        go.hideFlags = HideFlags.DontSave;
+#endif
     }
 
     public float GetCurrentZSpawn() => zSpawn;
@@ -508,13 +545,17 @@ public class SegmentLoopGenerator : MonoBehaviour
         if (segmentsRoot == null)
         {
             GameObject go = new GameObject("SegmentsRoot");
+            MarkAsRuntimeRoot(go);
             segmentsRoot = go.transform;
+            createdSegmentsRoot = true;
         }
 
         if (portalsRoot == null)
         {
             GameObject go = new GameObject("PortalsRoot");
+            MarkAsRuntimeRoot(go);
             portalsRoot = go.transform;
+            createdPortalsRoot = true;
         }
     }
 
@@ -544,9 +585,13 @@ public class SegmentLoopGenerator : MonoBehaviour
 #if UNITY_EDITOR
     private void OnDrawGizmosSelected()
     {
+        if (segmentsRoot == null) return;
+
+        float worldZ = segmentsRoot.position.z + zSpawn;
+        Vector3 a = new Vector3(-2f, 0f, worldZ);
+        Vector3 b = new Vector3(2f, 0f, worldZ);
         Gizmos.color = Color.cyan;
-        Gizmos.DrawLine(new Vector3(-2f, 0f, zSpawn), new Vector3(2f, 0f, zSpawn));
-        UnityEditor.Handles.Label(new Vector3(0f, 1f, zSpawn), $"zSpawn = {zSpawn:F1}");
+        Gizmos.DrawLine(a, b);
     }
 #endif
 }
