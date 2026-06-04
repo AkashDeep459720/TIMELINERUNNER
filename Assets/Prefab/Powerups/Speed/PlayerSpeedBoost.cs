@@ -8,20 +8,17 @@ public class PlayerSpeedBoost : MonoBehaviour
     public float defaultDuration = 5f;
 
     [Header("Refs")]
-    public PlayerMovement player;   // optional legacy reference
-    public WorldScrollController scrollController;
-    public SpeedBarUI speedBar;     // drag SpeedBarUI (Step 1)
-    public GameObject speedVFX;     // optional trail/glow
+    public PlayerMovement player;
+    public SpeedBarUI speedBar;
+    public GameObject speedVFX;
 
     bool active;
     float remaining;
-    float baseSpeed;
     Coroutine co;
 
     void Awake()
     {
         if (!player) player = FindFirstObjectByType<PlayerMovement>();
-        if (!scrollController) scrollController = FindFirstObjectByType<WorldScrollController>();
     }
 
     void Start()
@@ -29,7 +26,6 @@ public class PlayerSpeedBoost : MonoBehaviour
         if (speedVFX) speedVFX.SetActive(false);
     }
 
-    /// Call this from a pickup or powerup manager
     public void Activate(float duration = -1f)
     {
         if (duration <= 0f) duration = defaultDuration;
@@ -40,7 +36,6 @@ public class PlayerSpeedBoost : MonoBehaviour
         }
         else
         {
-            // refresh/extend duration while already active
             remaining = Mathf.Max(remaining, duration);
             if (speedBar) speedBar.StartTimer(remaining);
         }
@@ -51,18 +46,16 @@ public class PlayerSpeedBoost : MonoBehaviour
         active = true;
         remaining = duration;
 
-        if (!scrollController) scrollController = WorldScrollController.Instance;
-        baseSpeed = scrollController ? scrollController.CurrentScrollSpeed : 0f;
-        if (scrollController) scrollController.ActivateSpeedBoost(speedMultiplier, remaining);
-
         if (speedVFX) speedVFX.SetActive(true);
         if (speedBar) speedBar.StartTimer(remaining);
 
         while (remaining > 0f)
         {
+            WorldScrollController scroll = WorldScrollController.Instance;
+            if (scroll != null)
+                scroll.ActivateSpeedBoost(speedMultiplier, Mathf.Max(remaining, 0.01f));
+
             remaining -= Time.deltaTime;
-            if (scrollController)
-                scrollController.ActivateSpeedBoost(speedMultiplier, Mathf.Max(remaining, 0.01f));
             yield return null;
         }
 
@@ -75,7 +68,6 @@ public class PlayerSpeedBoost : MonoBehaviour
 
     void OnDisable()
     {
-        // safety: restore if object is disabled mid-boost
         if (active)
         {
             if (speedVFX) speedVFX.SetActive(false);
