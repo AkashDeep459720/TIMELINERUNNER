@@ -5,25 +5,29 @@ public class WorldScrollController : MonoBehaviour
 {
     public static WorldScrollController Instance { get; private set; }
 
-    [Header("Scroll Speed")]
+    [Header("Scroll Speed Profile (Inspector)")]
+    [SerializeField] private WorldScrollSpeedProfile scrollSpeedProfile;
+
+    [Header("Legacy Fallback (if no profile)")]
     [SerializeField] private float baseScrollSpeed = 8f;
     [SerializeField] private float maxScrollSpeed = 35f;
-
-    [Header("Difficulty Scaling")]
     [SerializeField] private bool useDifficultyScaling = true;
     [SerializeField] private float speedIncreaseAmount = 0.2f;
-    [SerializeField] private float speedIncreaseInterval = 30f;
+    [SerializeField] private float speedIncreaseInterval = 60f;
 
     [Header("Roots To Scroll")]
     [SerializeField] private List<Transform> scrollRoots = new List<Transform>();
 
     private float nextSpeedIncreaseTime;
+    private int rampTickCount;
     private float activeBoostMultiplier = 1f;
     private float boostEndTime = -1f;
     private bool externalPause;
 
     public float DistanceTravelled { get; private set; }
-    public float CurrentScrollSpeed => ShouldScroll() ? Mathf.Min(maxScrollSpeed, baseScrollSpeed * activeBoostMultiplier) : 0f;
+    public bool HasSpeedProfile => scrollSpeedProfile != null;
+    public float CurrentBaseScrollSpeed => baseScrollSpeed;
+    public float CurrentScrollSpeed => ShouldScroll() ? Mathf.Min(GetMaxScrollSpeed(), baseScrollSpeed * activeBoostMultiplier) : 0f;
 
     private void Awake()
     {
@@ -34,7 +38,8 @@ public class WorldScrollController : MonoBehaviour
         }
 
         Instance = this;
-        nextSpeedIncreaseTime = Time.timeSinceLevelLoad + speedIncreaseInterval;
+        ApplyProfileIfPresent();
+        ScheduleNextRamp();
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -55,11 +60,7 @@ public class WorldScrollController : MonoBehaviour
 
     private void Update()
     {
-        if (useDifficultyScaling && Time.timeSinceLevelLoad >= nextSpeedIncreaseTime)
-        {
-            baseScrollSpeed = Mathf.Min(maxScrollSpeed, baseScrollSpeed + speedIncreaseAmount);
-            nextSpeedIncreaseTime = Time.timeSinceLevelLoad + speedIncreaseInterval;
-        }
+        TryApplyTimeRamp();
 
         if (boostEndTime > 0f && Time.time >= boostEndTime)
         {
@@ -83,6 +84,67 @@ public class WorldScrollController : MonoBehaviour
 
             root.position += move;
         }
+    }
+
+    public void ApplySpeedProfile(WorldScrollSpeedProfile profile)
+    {
+        scrollSpeedProfile = profile;
+        ApplyProfileIfPresent();
+        ScheduleNextRamp();
+    }
+
+    private void ApplyProfileIfPresent()
+    {
+        if (scrollSpeedProfile == null) return;
+
+        baseScrollSpeed = scrollSpeedProfile.startingScrollSpeed;
+        maxScrollSpeed = scrollSpeedProfile.maxScrollSpeed;
+        useDifficultyScaling = scrollSpeedProfile.useTimeBasedRamp;
+        speedIncreaseAmount = scrollSpeedProfile.speedIncreaseAmount;
+        speedIncreaseInterval = scrollSpeedProfile.speedIncreaseIntervalSeconds;
+        rampTickCount = 0;
+    }
+
+    private void TryApplyTimeRamp()
+    {
+        if (!useDifficultyScaling) return;
+        if (scrollSpeedProfile != null && scrollSpeedProfile.pauseRampWhenScrollPaused && !ShouldScroll())
+            return;
+
+        if (Time.timeSinceLevelLoad < nextSpeedIncreaseTime) return;
+
+        float increment = speedIncreaseAmount;
+        if (scrollSpeedProfile != null)
+        {
+            int maxTicks = EstimateMaxRampTicks();
+            increment = scrollSpeedProfile.EvaluateIncrement(rampTickCount, maxTicks);
+        }
+
+        baseScrollSpeed = Mathf.Min(GetMaxScrollSpeed(), baseScrollSpeed + increment);
+        rampTickCount++;
+        ScheduleNextRamp();
+    }
+
+    private int EstimateMaxRampTicks()
+    {
+        float max = GetMaxScrollSpeed();
+        float start = scrollSpeedProfile != null ? scrollSpeedProfile.startingScrollSpeed : baseScrollSpeed;
+        float step = scrollSpeedProfile != null ? scrollSpeedProfile.speedIncreaseAmount : speedIncreaseAmount;
+        if (step <= 0f) return 1;
+        return Mathf.Max(1, Mathf.CeilToInt((max - start) / step));
+    }
+
+    private void ScheduleNextRamp()
+    {
+        float interval = scrollSpeedProfile != null
+            ? scrollSpeedProfile.speedIncreaseIntervalSeconds
+            : speedIncreaseInterval;
+        nextSpeedIncreaseTime = Time.timeSinceLevelLoad + Mathf.Max(1f, interval);
+    }
+
+    private float GetMaxScrollSpeed()
+    {
+        return scrollSpeedProfile != null ? scrollSpeedProfile.maxScrollSpeed : maxScrollSpeed;
     }
 
     public void ConfigureBaseScrollSpeed(float speed)

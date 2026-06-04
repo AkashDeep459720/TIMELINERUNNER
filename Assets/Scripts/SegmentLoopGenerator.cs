@@ -39,8 +39,8 @@ public class SegmentLoopGenerator : MonoBehaviour
     public int maxSegments = 6;
     [SerializeField] private float recycleBehindPlayerDistance = 60f;
 
-    [Header("Egypt Landing (optional)")]
-    public Transform egyptLandingPoint;
+    [Header("Egypt Runway (portal swap)")]
+    [SerializeField] private int egyptRunwaySegmentCount = 3;
 
     [Header("World Roots")]
     [SerializeField] private Transform segmentsRoot;
@@ -197,10 +197,7 @@ public class SegmentLoopGenerator : MonoBehaviour
     public void SwitchToEgyptTimeline()
     {
         if (!inEgyptTimeline)
-        {
             inEgyptTimeline = true;
-            Debug.Log("🟠 [Gen] Switched to Egypt timeline");
-        }
     }
 
     public void ResetZ(float newStartZ)
@@ -223,7 +220,52 @@ public class SegmentLoopGenerator : MonoBehaviour
         }
 
         egyptRunwaySpawned = true;
-        Debug.Log($"📦 [Gen] Forced spawn of {count} Egypt segments at z = {zSpawn}");
+    }
+
+    /// <summary>
+    /// Masked portal swap: clear robot tiles, align spawn cursor to player, spawn Egypt runway in place.
+    /// </summary>
+    public void PrepareEgyptRunwayAtPlayer(Transform playerTransform)
+    {
+        if (playerTransform == null) return;
+
+        EnsureRoots();
+        SwitchToEgyptTimeline();
+
+        ClearActiveSegments();
+
+        float playerWorldZ = playerTransform.position.z;
+        float rootZ = segmentsRoot.position.z;
+        zSpawn = playerWorldZ - rootZ;
+
+        egyptRunwaySpawned = false;
+
+        GameObject[] pool = egyptSegments;
+        if (pool == null || pool.Length == 0) return;
+
+        int count = Mathf.Max(1, egyptRunwaySegmentCount);
+        for (int i = 0; i < count; i++)
+        {
+            GameObject prefab = pool[Random.Range(0, pool.Length)];
+            SpawnSegment(prefab);
+        }
+
+        egyptRunwaySpawned = true;
+        portalSpawned = true;
+        portalQueued = false;
+
+        PortalEvents.OnPortalSpawned?.Invoke(playerTransform.position);
+    }
+
+    private void ClearActiveSegments()
+    {
+        for (int i = activeSegments.Count - 1; i >= 0; i--)
+        {
+            if (activeSegments[i] != null)
+                Destroy(activeSegments[i]);
+        }
+
+        activeSegments.Clear();
     }
 
     public float GetCurrentZSpawn() => zSpawn;
@@ -316,13 +358,7 @@ public class SegmentLoopGenerator : MonoBehaviour
     private void SpawnPortal(Vector3 pos, Quaternion rot)
     {
         EnsureRoots();
-        var go = Instantiate(portalPrefab, pos, rot, portalsRoot);
-
-        var trig = go.GetComponent<PortalTrigger>();
-        if (trig != null && egyptLandingPoint != null)
-        {
-            trig.SetDestination(egyptLandingPoint);
-        }
+        Instantiate(portalPrefab, pos, rot, portalsRoot);
 
         lastPortalDistance = GetRunDistance();
         portalSpawned = true;
@@ -330,8 +366,9 @@ public class SegmentLoopGenerator : MonoBehaviour
         queuedTime = -1f;
         PortalEvents.OnPortalSpawned?.Invoke(pos);
 
-        Debug.Log($"🌀 [Gen] Portal spawned at Z {pos.z}");
     }
+
+    public bool IsInEgyptTimeline => inEgyptTimeline;
 
     private void AlignEgyptSegment(GameObject segment)
     {
