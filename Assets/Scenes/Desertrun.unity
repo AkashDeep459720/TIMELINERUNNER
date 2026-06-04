@@ -3290,7 +3290,7 @@ MonoBehaviour:
   robotConfig: {fileID: 11400000, guid: 311bea54f652e3f46a50255cdfb4fe4b, type: 2}
   egyptConfig: {fileID: 11400000, guid: 3a98f76814ed58a46b2edff3415a9dcf, type: 2}
   obstaclesRoot: {fileID: 367553618}
-  robotSpawnProfile: {fileID: 11400000, guid: a8f3e2d1c0b9a8f7e6d5c4b3a291807, type: 2}
+  robotSpawnProfile: {fileID: 11400000, guid: a8f3e2d1c0b9a8f7e6d5c4b3a29180e7, type: 2}
   useDifficultyScaling: 1
   distanceForMaxDifficulty: 500
   comboChanceStart: 0.1
