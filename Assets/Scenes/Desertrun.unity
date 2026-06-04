@@ -3293,7 +3293,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1699871715}
-  - component: {fileID: 1699871716}
   - component: {fileID: 1699871714}
   - component: {fileID: 1699871713}
   m_Layer: 0
@@ -3319,7 +3318,8 @@ MonoBehaviour:
   robotConfig: {fileID: 11400000, guid: 311bea54f652e3f46a50255cdfb4fe4b, type: 2}
   egyptConfig: {fileID: 11400000, guid: 3a98f76814ed58a46b2edff3415a9dcf, type: 2}
   obstaclesRoot: {fileID: 367553618}
-  robotSpawnProfile: {fileID: 11400000, guid: a8f3e2d1c0b9a8f7e6d5c4b3a291807, type: 2}
+  robotSpawnProfile: {fileID: 11400000, guid: 40d293bddbb2475b8230ba91b2cebb0b, type: 2}
+  scrollSpeedProfile: {fileID: 11400000, guid: dd87d45738354caaaa49c1d23d4ba16e, type: 2}
   useDifficultyScaling: 1
   distanceForMaxDifficulty: 500
   comboChanceStart: 0.1
@@ -3329,25 +3329,6 @@ MonoBehaviour:
   minGroupSpacing: 5
   maxGroupSpacing: 7
   emptySegmentInterval: 5
---- !u!114 &1699871716
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1699871712}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1c9e8f7a6b5d4e3f2a1b0c9d8e7f6a5b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  scrollSpeedProfile: {fileID: 11400000, guid: b9e4f3a2c1d0e9f8a7b6c5d4e3f2a109, type: 2}
-  baseScrollSpeed: 8
-  maxScrollSpeed: 35
-  useDifficultyScaling: 1
-  speedIncreaseAmount: 0.2
-  speedIncreaseInterval: 60
-  scrollRoots: []
 --- !u!114 &1699871714
 MonoBehaviour:
   m_ObjectHideFlags: 0

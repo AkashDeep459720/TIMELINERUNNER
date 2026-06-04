@@ -12,6 +12,9 @@ public class ObstacleSpawner : MonoBehaviour
     [Header("Robot Tuning (Inspector)")]
     public RobotSpawnProfile robotSpawnProfile;
 
+    [Header("World Scroll (Inspector)")]
+    public WorldScrollSpeedProfile scrollSpeedProfile;
+
     [Header("Egypt Tuning (unchanged when egypt active)")]
     public bool useDifficultyScaling = true;
     public float distanceForMaxDifficulty = 500f;
@@ -47,6 +50,7 @@ public class ObstacleSpawner : MonoBehaviour
         if (player) playerMovement = player.GetComponent<PlayerMovement>();
 
         TryRegisterRoot();
+        ApplyWorldScrollProfile();
         activeConfig = robotConfig;
 
         SegmentLoopGenerator.OnSegmentSpawned += HandleSegmentSpawned;
@@ -385,5 +389,17 @@ public class ObstacleSpawner : MonoBehaviour
         if (rootRegistered || obstaclesRoot == null || WorldScrollController.Instance == null) return;
         WorldScrollController.Instance.RegisterScrollRoot(obstaclesRoot);
         rootRegistered = true;
+    }
+
+    private void ApplyWorldScrollProfile()
+    {
+        if (scrollSpeedProfile == null) return;
+
+        WorldScrollController controller = WorldScrollController.Instance;
+        if (controller == null)
+            controller = FindFirstObjectByType<WorldScrollController>();
+
+        if (controller != null)
+            controller.ApplySpeedProfile(scrollSpeedProfile);
     }
 }
