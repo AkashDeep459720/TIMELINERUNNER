@@ -38,6 +38,12 @@ public class ObstacleSpawner : MonoBehaviour
     private bool skipNextSegment;
     private bool rootRegistered;
 
+    private enum RhythmPhase { Combat, Breath }
+    private RhythmPhase rhythmPhase = RhythmPhase.Combat;
+    private float rhythmPhaseElapsed;
+    private int combatCycleIndex;
+    private bool rhythmEnabled;
+
     private const float segmentLength = 50f;
 
     private bool UsingRobotProfile => activeConfig == robotConfig && robotSpawnProfile != null;
@@ -70,6 +76,68 @@ public class ObstacleSpawner : MonoBehaviour
             playerDistanceTravelled = WorldScrollController.Instance.DistanceTravelled;
         else if (player)
             playerDistanceTravelled = player.position.z;
+
+        UpdateCombatBreathRhythm();
+    }
+
+    private void UpdateCombatBreathRhythm()
+    {
+        if (!UsingRobotProfile || !robotSpawnProfile.useCombatBreathRhythm) return;
+        if (activeConfig != robotConfig) return;
+
+        bool pastGrace = segmentCounter > robotSpawnProfile.graceSegmentsAfterRunStart
+                         && playerDistanceTravelled >= robotSpawnProfile.graceDistance;
+
+        if (!pastGrace)
+        {
+            rhythmEnabled = false;
+            return;
+        }
+
+        if (!rhythmEnabled)
+        {
+            rhythmEnabled = true;
+            rhythmPhase = RhythmPhase.Combat;
+            rhythmPhaseElapsed = 0f;
+            combatCycleIndex = 0;
+        }
+
+        if (!IsRhythmClockRunning()) return;
+
+        rhythmPhaseElapsed += Time.deltaTime;
+        float phaseDuration = rhythmPhase == RhythmPhase.Combat
+            ? robotSpawnProfile.combatPhaseDurationSeconds
+            : robotSpawnProfile.breathPhaseDurationSeconds;
+
+        if (rhythmPhaseElapsed < phaseDuration) return;
+
+        rhythmPhaseElapsed = 0f;
+        if (rhythmPhase == RhythmPhase.Combat)
+        {
+            rhythmPhase = RhythmPhase.Breath;
+        }
+        else
+        {
+            rhythmPhase = RhythmPhase.Combat;
+            combatCycleIndex++;
+        }
+    }
+
+    private bool IsRhythmClockRunning()
+    {
+        if (GameState.IsPaused) return false;
+        if (playerMovement != null && playerMovement.isFrozen) return false;
+        if (WorldScrollController.Instance != null)
+            return WorldScrollController.Instance.CurrentScrollSpeed > 0f;
+        return true;
+    }
+
+    private bool IsInBreathPhase()
+    {
+        return UsingRobotProfile
+               && robotSpawnProfile.useCombatBreathRhythm
+               && rhythmEnabled
+               && rhythmPhase == RhythmPhase.Breath;
     }
 
     private void HandleSegmentSpawned(GameObject segment)
@@ -79,6 +147,9 @@ public class ObstacleSpawner : MonoBehaviour
         if (!HasAnyPrefabs(activeConfig)) return;
 
         segmentCounter++;
+
+        if (IsInBreathPhase() && robotSpawnProfile.breathSkipSpawns)
+            return;
 
         if (skipNextSegment)
         {
@@ -259,6 +330,28 @@ public class ObstacleSpawner : MonoBehaviour
         float wLane = robotSpawnProfile.weightLaneBlocker * Mathf.Lerp(0.5f, 1.2f, difficultyFactor);
         float wFull = robotSpawnProfile.weightFullLane * difficultyFactor;
 
+        if (rhythmEnabled && rhythmPhase == RhythmPhase.Combat)
+        {
+            CombatPatternVariant variant = robotSpawnProfile.GetCombatPatternVariant(combatCycleIndex);
+            switch (variant)
+            {
+                case CombatPatternVariant.LaneBlocker:
+                    wJump *= 0.2f;
+                    wLane *= 2.5f;
+                    wFull *= 0.5f;
+                    break;
+                case CombatPatternVariant.JumpSlide:
+                    wJump *= 2.5f;
+                    wLane *= 0.2f;
+                    wFull *= 0.3f;
+                    break;
+                case CombatPatternVariant.Mixed:
+                    wJump *= 1.4f;
+                    wLane *= 1.4f;
+                    break;
+            }
+        }
+
         if (!excludeFullLane && fullLane.Count > 0 && Random.value > robotSpawnProfile.fullLaneMaxChance)
             wFull = 0f;
 
@@ -323,6 +416,7 @@ public class ObstacleSpawner : MonoBehaviour
         segmentCounter = 0;
         lastSpawnZ = -999f;
         lastSpawnDistance = -999f;
+        rhythmEnabled = false;
     }
 
     private float GetDifficultyFactor()
@@ -337,14 +431,24 @@ public class ObstacleSpawner : MonoBehaviour
     private float GetComboChance(float difficultyFactor)
     {
         if (UsingRobotProfile)
+        {
+            if (rhythmEnabled && rhythmPhase == RhythmPhase.Combat)
+                return robotSpawnProfile.combatComboChance;
+            if (rhythmEnabled && rhythmPhase == RhythmPhase.Breath)
+                return robotSpawnProfile.breathComboChance;
             return robotSpawnProfile.EvaluateComboChance(difficultyFactor);
+        }
         return Mathf.Lerp(comboChanceStart, comboChanceEnd, difficultyFactor);
     }
 
     private float GetGroupSpacing(float difficultyFactor)
     {
         if (UsingRobotProfile)
+        {
+            if (rhythmEnabled && rhythmPhase == RhythmPhase.Combat)
+                return robotSpawnProfile.combatMinGroupSpacing;
             return robotSpawnProfile.EvaluateGroupSpacing(difficultyFactor);
+        }
         return Mathf.Lerp(minGroupSpacing, maxGroupSpacing, difficultyFactor);
     }
 
@@ -356,7 +460,13 @@ public class ObstacleSpawner : MonoBehaviour
 
     private bool GetEmptySegmentAfterCombo()
     {
-        if (UsingRobotProfile) return robotSpawnProfile.emptySegmentAfterCombo;
+        if (UsingRobotProfile)
+        {
+            if (rhythmEnabled && rhythmPhase == RhythmPhase.Combat
+                && robotSpawnProfile.disableEmptySegmentAfterComboInCombat)
+                return false;
+            return robotSpawnProfile.emptySegmentAfterCombo;
+        }
         return emptySegmentAfterCombo;
     }
 

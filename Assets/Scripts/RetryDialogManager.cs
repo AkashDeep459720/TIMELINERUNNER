@@ -5,10 +5,17 @@ using System.Collections;
 
 public class RetryDialogManager : MonoBehaviour
 {
+    public struct RunResultsSnapshot
+    {
+        public int finalDistanceMeters;
+        public int runCoinsCollected;
+        public int walletBeforeBank;
+    }
+
     [Header("Refs")]
-    [SerializeField] private GameObject retryPanel;      // 660x700 panel
-    [SerializeField] private GameObject gameOverPanel;   // Fullscreen takeover
-    [SerializeField] private Image fadePanel;            // Fullscreen black overlay
+    [SerializeField] private GameObject retryPanel;
+    [SerializeField] private GameObject gameOverPanel;
+    [SerializeField] private Image fadePanel;
     [SerializeField] private TMP_Text costText;
     [SerializeField] private Button tokenButton;
     [SerializeField] private Button adButton;
@@ -19,23 +26,25 @@ public class RetryDialogManager : MonoBehaviour
     [SerializeField] private TMP_Text distanceText;
     [SerializeField] private TMP_Text runCoinsText;
     [SerializeField] private TMP_Text walletCoinsText;
+    [SerializeField] private TMP_Text tapHintText;
+    [SerializeField] private Button tapToBankButton;
     [SerializeField] private Button tryAgainButton;
     [SerializeField] private Button mainMenuButton;
 
     [Header("Settings")]
     [SerializeField] private float fadeDuration = 1f;
     [SerializeField] private int maxAdsPerRun = 3;
+    [SerializeField] private float coinTransferDuration = 1f;
 
-    // Internal
     private PlayerMovement move;
     private Animator anim;
     private ObstacleTriggerHandler currentObstacle;
     private int retryCount = 0;
     private int adsUsedThisRun = 0;
     private bool runOver = false;
-    private bool coinsAlreadyBanked = false; // Prevent double banking
-
-    // 🔧 NEW: Store death position for consistent revival
+    private bool coinsAlreadyBanked = false;
+    private bool coinTransferInProgress = false;
+    private RunResultsSnapshot runSnapshot;
     private Vector3 deathPosition;
 
     private void Awake()
@@ -47,11 +56,14 @@ public class RetryDialogManager : MonoBehaviour
 #endif
         if (move) anim = move.GetComponentInChildren<Animator>();
 
+        ResolveGameOverRefs();
+
         if (tokenButton) tokenButton.onClick.AddListener(OnUseToken);
         if (adButton) adButton.onClick.AddListener(OnWatchAd);
         if (noThanksButton) noThanksButton.onClick.AddListener(OnNoThanks);
         if (tryAgainButton) tryAgainButton.onClick.AddListener(OnTryAgain);
         if (mainMenuButton) mainMenuButton.onClick.AddListener(OnMainMenu);
+        if (tapToBankButton) tapToBankButton.onClick.AddListener(OnTapToBankCoins);
 
         if (gameOverPanel) gameOverPanel.SetActive(false);
         if (retryPanel) retryPanel.SetActive(false);
@@ -59,9 +71,35 @@ public class RetryDialogManager : MonoBehaviour
         if (fadePanel) fadePanel.color = new Color(0, 0, 0, 0);
     }
 
+    private void ResolveGameOverRefs()
+    {
+        if (gameOverPanel == null) return;
+
+        TMP_Text[] texts = gameOverPanel.GetComponentsInChildren<TMP_Text>(true);
+        foreach (TMP_Text t in texts)
+        {
+            string n = t.gameObject.name;
+            if (n.Contains("Distance")) distanceText = t;
+            else if (n.Contains("RunCoins")) runCoinsText = t;
+            else if (n.Contains("Wallet")) walletCoinsText = t;
+            else if (n.Contains("TapHint")) tapHintText = t;
+        }
+
+        if (tapToBankButton == null)
+        {
+            foreach (Button b in gameOverPanel.GetComponentsInChildren<Button>(true))
+            {
+                if (b.gameObject.name.Contains("TapToBank"))
+                {
+                    tapToBankButton = b;
+                    break;
+                }
+            }
+        }
+    }
+
     private void Start()
     {
-        // Reset counters at start of new run
         ResetRunCounters();
     }
 
@@ -71,9 +109,9 @@ public class RetryDialogManager : MonoBehaviour
         adsUsedThisRun = 0;
         runOver = false;
         coinsAlreadyBanked = false;
-
-        // Reset MasterInfo run state
+        coinTransferInProgress = false;
         MasterInfo.retryUsedThisRun = false;
+        SetGameOverHudPaused(false);
 
         Debug.Log("🔄 Run counters reset");
     }
@@ -82,7 +120,6 @@ public class RetryDialogManager : MonoBehaviour
     {
         if (runOver) return;
 
-        // 🔧 FIX: Store current position when death occurs for consistent revival
         if (move != null)
         {
             deathPosition = move.transform.position;
@@ -100,16 +137,12 @@ public class RetryDialogManager : MonoBehaviour
 
     private void UpdateRetryUI()
     {
-        int cost = Mathf.RoundToInt(Mathf.Pow(2, retryCount)); // 1,2,4,8...
+        int cost = Mathf.RoundToInt(Mathf.Pow(2, retryCount));
         if (costText) costText.text = "Cost: x" + cost;
 
-        // Token button logic - disabled if insufficient tokens, but always visible
         if (tokenButton)
-        {
             tokenButton.interactable = MasterInfo.retryTokens >= cost;
-        }
 
-        // Ad button logic - always visible, but disabled when limit reached
         if (adButton)
         {
             bool canUseAd = adsUsedThisRun < maxAdsPerRun;
@@ -117,10 +150,9 @@ public class RetryDialogManager : MonoBehaviour
 
             if (adButtonText)
             {
-                if (canUseAd)
-                    adButtonText.text = $"Watch Ad ({maxAdsPerRun - adsUsedThisRun} left)";
-                else
-                    adButtonText.text = "No Ads Left";
+                adButtonText.text = canUseAd
+                    ? $"Watch Ad ({maxAdsPerRun - adsUsedThisRun} left)"
+                    : "No Ads Left";
             }
         }
     }
@@ -129,14 +161,13 @@ public class RetryDialogManager : MonoBehaviour
     {
         int cost = Mathf.RoundToInt(Mathf.Pow(2, retryCount));
 
-        // Double check tokens (should match button interactable state)
         if (MasterInfo.retryTokens >= cost)
         {
             MasterInfo.retryTokens -= cost;
             PlayerPrefs.SetInt("RetryTokens", MasterInfo.retryTokens);
             PlayerPrefs.Save();
 
-            retryCount++; // Increment retry count for next death
+            retryCount++;
             ResumeRun();
 
             Debug.Log($"💰 Used {cost} tokens. Remaining: {MasterInfo.retryTokens}");
@@ -144,7 +175,6 @@ public class RetryDialogManager : MonoBehaviour
         else
         {
             Debug.Log("❌ Not enough tokens.");
-            // Refresh UI in case of sync issues
             UpdateRetryUI();
         }
     }
@@ -160,7 +190,7 @@ public class RetryDialogManager : MonoBehaviour
         Debug.Log($"📺 Simulating rewarded ad... ({adsUsedThisRun + 1}/{maxAdsPerRun})");
 
         adsUsedThisRun++;
-        retryCount++; // Increment retry count for next death
+        retryCount++;
         ResumeRun();
     }
 
@@ -175,39 +205,53 @@ public class RetryDialogManager : MonoBehaviour
     {
         Debug.Log("🔄 Try Again pressed");
 
-        // Reset for new run
-        ResetRunCounters();
+        if (!coinsAlreadyBanked && runSnapshot.runCoinsCollected > 0)
+            MasterInfo.BankRunCoins(runSnapshot.runCoinsCollected);
 
-        // Hide game over panel
+        ResetRunCounters();
         gameOverPanel.SetActive(false);
 
-        // Reset fade panel
         if (fadePanel) fadePanel.color = new Color(0, 0, 0, 0);
 
         Time.timeScale = 1f;
-
-        // Restart the game/level
-        // This would typically reload the scene or reset game state
-        // You might want to call your game manager's restart method here
-        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+        UnityEngine.SceneManagement.SceneManager.LoadScene(
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
     }
 
     private void OnMainMenu()
     {
         Debug.Log("🏠 Returning to Main Menu");
 
-        Time.timeScale = 1f;
+        if (!coinsAlreadyBanked && runSnapshot.runCoinsCollected > 0)
+            MasterInfo.BankRunCoins(runSnapshot.runCoinsCollected);
 
-        // Load main menu scene
-        // Replace "MainMenu" with your actual main menu scene name
+        Time.timeScale = 1f;
         UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu");
+    }
+
+    private void OnTapToBankCoins()
+    {
+        if (coinsAlreadyBanked || coinTransferInProgress || runSnapshot.runCoinsCollected <= 0)
+            return;
+
+        StartCoroutine(TransferCoinsAnimation());
+    }
+
+    private void CaptureRunSnapshot()
+    {
+        runSnapshot = new RunResultsSnapshot
+        {
+            finalDistanceMeters = DistanceTracker.GetDistanceMeters(),
+            runCoinsCollected = MasterInfo.coinCount,
+            walletBeforeBank = MasterInfo.totalCoins
+        };
     }
 
     private IEnumerator FadeToGameOver()
     {
         runOver = true;
+        CaptureRunSnapshot();
 
-        // Fade to black
         if (fadePanel)
         {
             float t = 0f;
@@ -220,85 +264,122 @@ public class RetryDialogManager : MonoBehaviour
             }
         }
 
-        // ✅ Bank coins ONLY ONCE at final game over
-        if (!coinsAlreadyBanked)
-        {
-            MasterInfo.BankRunCoins();
-            coinsAlreadyBanked = true;
-            Debug.Log("💰 Coins banked at Game Over");
-        }
-
-        // Update Game Over UI
+        SetGameOverHudPaused(true);
         UpdateGameOverUI();
+        ConfigureTapToBankState();
 
         gameOverPanel.SetActive(true);
         Time.timeScale = 0f;
     }
 
-    private void UpdateGameOverUI()
+    private void SetGameOverHudPaused(bool paused)
     {
-        // Distance display using DistanceTracker
-        if (distanceText && DistanceTracker.Instance)
-            distanceText.text = $"Distance: {FormatNumber(DistanceTracker.Instance.currentDistance)}m";
-
-        // Run coins collected using MasterInfo
-        if (runCoinsText)
-            runCoinsText.text = $"Coins Collected: {FormatNumber(MasterInfo.coinCount)}";
-
-        // Animated wallet total
-        if (walletCoinsText)
-            StartCoroutine(AnimateWallet(MasterInfo.totalCoins - MasterInfo.coinCount, MasterInfo.totalCoins));
+        MasterInfo.pauseHudUpdates = paused;
+        DistanceTracker.pauseHudUpdates = paused;
     }
 
-    private IEnumerator AnimateWallet(int from, int to)
+    private void UpdateGameOverUI()
     {
-        float elapsed = 0f;
-        float animationDuration = 1f;
+        if (distanceText)
+            distanceText.text = $"Distance: {FormatNumber(runSnapshot.finalDistanceMeters)}m";
 
-        while (elapsed < animationDuration)
+        if (runCoinsText)
+            runCoinsText.text = $"Coins Collected: {FormatNumber(runSnapshot.runCoinsCollected)}";
+
+        if (walletCoinsText)
+            walletCoinsText.text = $"Wallet: {FormatNumber(runSnapshot.walletBeforeBank)}";
+    }
+
+    private void ConfigureTapToBankState()
+    {
+        bool hasCoins = runSnapshot.runCoinsCollected > 0 && !coinsAlreadyBanked;
+
+        if (tapToBankButton)
+            tapToBankButton.interactable = hasCoins;
+
+        if (tapHintText)
+        {
+            tapHintText.text = hasCoins
+                ? "Tap to add coins to wallet"
+                : (coinsAlreadyBanked ? "Tap Try Again to restart" : "");
+        }
+
+        if (tryAgainButton)
+            tryAgainButton.interactable = !hasCoins || coinsAlreadyBanked;
+    }
+
+    private IEnumerator TransferCoinsAnimation()
+    {
+        coinTransferInProgress = true;
+
+        if (tapToBankButton) tapToBankButton.interactable = false;
+
+        int fromRun = runSnapshot.runCoinsCollected;
+        int fromWallet = runSnapshot.walletBeforeBank;
+        int toWallet = fromWallet + fromRun;
+        float elapsed = 0f;
+
+        while (elapsed < coinTransferDuration)
         {
             elapsed += Time.unscaledDeltaTime;
-            float progress = elapsed / animationDuration;
-            int val = Mathf.RoundToInt(Mathf.Lerp(from, to, progress));
-            walletCoinsText.text = $"Wallet: {FormatNumber(val)}";
+            float t = Mathf.Clamp01(elapsed / coinTransferDuration);
+
+            int displayRun = Mathf.RoundToInt(Mathf.Lerp(fromRun, 0, t));
+            int displayWallet = Mathf.RoundToInt(Mathf.Lerp(fromWallet, toWallet, t));
+
+            if (runCoinsText)
+            {
+                runCoinsText.text = $"Coins Collected: {FormatNumber(displayRun)}";
+                runCoinsText.transform.localScale = Vector3.one * (1f + 0.08f * Mathf.Sin(t * Mathf.PI));
+            }
+
+            if (walletCoinsText)
+                walletCoinsText.text = $"Wallet: {FormatNumber(displayWallet)}";
+
             yield return null;
         }
 
-        // Ensure final value is exact
-        walletCoinsText.text = $"Wallet: {FormatNumber(to)}";
+        if (runCoinsText)
+        {
+            runCoinsText.text = "Coins Collected: 0";
+            runCoinsText.transform.localScale = Vector3.one;
+        }
+
+        if (walletCoinsText)
+            walletCoinsText.text = $"Wallet: {FormatNumber(toWallet)}";
+
+        MasterInfo.BankRunCoins(fromRun);
+        coinsAlreadyBanked = true;
+        coinTransferInProgress = false;
+
+        if (tapHintText)
+            tapHintText.text = "Tap Try Again to restart";
+
+        if (tryAgainButton)
+            tryAgainButton.interactable = true;
+
+        Debug.Log("💰 Coins transferred to wallet on tap");
     }
 
     private void ResumeRun()
     {
         retryPanel.SetActive(false);
         Time.timeScale = 1f;
-
-        // 🔧 FIX: Smooth animator restoration
         StartCoroutine(SmoothResumeSequence());
-
         Debug.Log("▶️ Resuming run...");
     }
 
-    // 🔧 NEW: Smooth resume sequence to prevent animation glitches
     private IEnumerator SmoothResumeSequence()
     {
-        // First restore obstacle animator if needed
         if (currentObstacle != null)
-        {
             currentObstacle.RestoreAnimatorState();
-        }
         else if (anim && anim.speed == 0f)
-        {
             anim.speed = 1f;
-        }
 
-        // Wait one frame for animator to update
         yield return null;
 
-        // 🔧 FIX: Use stored death position for consistent revival location
         Vector3 revivalPosition = deathPosition;
 
-        // Ensure we have a valid revival position
         if (move != null)
         {
             if (revivalPosition == Vector3.zero)
@@ -307,7 +388,6 @@ public class RetryDialogManager : MonoBehaviour
                 Debug.LogWarning("⚠️ Using current position as death position was not stored");
             }
 
-            // Revive player at the exact death location (no extra offsets)
             move.ReviveAt(revivalPosition);
         }
 
@@ -319,17 +399,13 @@ public class RetryDialogManager : MonoBehaviour
         currentObstacle = obstacle;
     }
 
-    // Called when player quits/pauses mid-run
     public void OnRunAbandoned()
     {
         Debug.Log("🚪 Run abandoned - coins NOT banked");
-        // Don't bank coins when quitting mid-run
-        // Reset MasterInfo.coinCount to 0 to discard collected coins
         MasterInfo.coinCount = 0;
         ResetRunCounters();
     }
 
-    // Utility method to check if player can retry
     public bool CanRetry()
     {
         if (runOver) return false;
@@ -341,7 +417,6 @@ public class RetryDialogManager : MonoBehaviour
         return hasTokens || hasAds;
     }
 
-    // Get current retry cost for UI display elsewhere
     public int GetCurrentRetryCost()
     {
         return Mathf.RoundToInt(Mathf.Pow(2, retryCount));
@@ -349,15 +424,12 @@ public class RetryDialogManager : MonoBehaviour
 
     private string FormatNumber(int num)
     {
-        return string.Format("{0:n0}", num); // adds commas (e.g., 1,250)
+        return string.Format("{0:n0}", num);
     }
 
-    // Optional: Force show game over (for testing or special cases)
     public void ForceGameOver()
     {
         if (!runOver)
-        {
             OnNoThanks();
-        }
     }
 }

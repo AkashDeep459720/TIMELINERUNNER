@@ -9,7 +9,9 @@ public class WorldScrollSpeedProfile : ScriptableObject
 
     [Header("Time-Based Ramp")]
     public bool useTimeBasedRamp = true;
-    [Min(1f)] public float speedIncreaseIntervalSeconds = 60f;
+    [Min(1f)] public float speedIncreaseIntervalSeconds = 30f;
+    [Min(0f)] public float firstRampDelaySeconds = 30f;
+    [Min(0f)] public float firstRampBonus = 5f;
     [Min(0f)] public float speedIncreaseAmount = 0.2f;
     public bool pauseRampWhenScrollPaused = true;
 
@@ -19,6 +21,9 @@ public class WorldScrollSpeedProfile : ScriptableObject
 
     public float EvaluateIncrement(int rampTickIndex, int estimatedMaxTicks)
     {
+        if (rampTickIndex == 0)
+            return firstRampBonus;
+
         if (!useRampCurve || rampCurve == null || estimatedMaxTicks <= 0)
             return speedIncreaseAmount;
 

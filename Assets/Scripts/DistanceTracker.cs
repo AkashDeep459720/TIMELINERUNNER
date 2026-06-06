@@ -10,6 +10,8 @@ public class DistanceTracker : MonoBehaviour
 
     public int currentDistance { get; private set; }
 
+    public static bool pauseHudUpdates = false;
+
     void Awake()
     {
         Instance = this;
@@ -17,20 +19,23 @@ public class DistanceTracker : MonoBehaviour
 
     void Update()
     {
-        if (WorldScrollController.Instance != null)
-            currentDistance = Mathf.RoundToInt(WorldScrollController.Instance.DistanceTravelled);
-        else if (player != null)
-            currentDistance = Mathf.RoundToInt(player.position.z);
-        else
-            currentDistance = 0;
+        currentDistance = GetDistanceMeters();
 
-        // update UI text
-        if (distanceText)
-            distanceText.text = $"{FormatNumber(currentDistance)}m";
+        if (pauseHudUpdates || distanceText == null) return;
+
+        distanceText.text = $"{FormatNumber(currentDistance)}m";
+    }
+
+    public static int GetDistanceMeters()
+    {
+        if (WorldScrollController.Instance != null)
+            return Mathf.FloorToInt(WorldScrollController.Instance.DistanceTravelled);
+
+        return 0;
     }
 
     private string FormatNumber(int num)
     {
-        return string.Format("{0:n0}", num); // adds commas
+        return string.Format("{0:n0}", num);
     }
 }

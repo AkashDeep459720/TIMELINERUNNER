@@ -1,5 +1,12 @@
 using UnityEngine;
 
+public enum CombatPatternVariant
+{
+    LaneBlocker = 0,
+    JumpSlide = 1,
+    Mixed = 2
+}
+
 [CreateAssetMenu(fileName = "RobotSpawnProfile", menuName = "Configs/Robot Spawn Profile")]
 public class RobotSpawnProfile : ScriptableObject
 {
@@ -36,6 +43,16 @@ public class RobotSpawnProfile : ScriptableObject
     public float weightFullLane = 0.5f;
     [Range(0f, 1f)] public float fullLaneMaxChance = 0.1f;
 
+    [Header("Combat / Breathe Rhythm")]
+    public bool useCombatBreathRhythm = true;
+    public float combatPhaseDurationSeconds = 8f;
+    public float breathPhaseDurationSeconds = 3f;
+    [Range(0f, 1f)] public float combatComboChance = 0.9f;
+    public float combatMinGroupSpacing = 8f;
+    [Range(0f, 1f)] public float breathComboChance = 0f;
+    public bool breathSkipSpawns = true;
+    public bool disableEmptySegmentAfterComboInCombat = true;
+
     public float EvaluateDifficultyFactor(float distanceTravelled, bool useScaling)
     {
         if (!useScaling) return 0f;
@@ -67,5 +84,12 @@ public class RobotSpawnProfile : ScriptableObject
             return spacingCurve.Evaluate(difficultyFactor);
 
         return Mathf.Lerp(maxGroupSpacing, minGroupSpacing, difficultyFactor);
+    }
+
+    public CombatPatternVariant GetCombatPatternVariant(int cycleIndex)
+    {
+        int mod = cycleIndex % 3;
+        if (mod < 0) mod += 3;
+        return (CombatPatternVariant)mod;
     }
 }

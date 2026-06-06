@@ -32,3 +32,11 @@ MonoBehaviour:
   weightLaneBlocker: 1
   weightFullLane: 0.5
   fullLaneMaxChance: 0.1
+  useCombatBreathRhythm: 1
+  combatPhaseDurationSeconds: 8
+  breathPhaseDurationSeconds: 3
+  combatComboChance: 0.9
+  combatMinGroupSpacing: 8
+  breathComboChance: 0
+  breathSkipSpawns: 1
+  disableEmptySegmentAfterComboInCombat: 1
