@@ -116,19 +116,13 @@ MonoBehaviour:
   playerMovement: {fileID: 0}
   playerAnimator: {fileID: 0}
   segmentGenerator: {fileID: 0}
-  egyptLandingPoint: {fileID: 0}
   enterPortalTrigger: EnterPortal
   landInEgyptTrigger: LandInEgypt
   enterPortalDelay: 1
+  fadeOutDuration: 0.35
+  fadeInDuration: 0.35
   afterLandingDelay: 0.4
-  groundMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  raycastUp: 3
-  raycastDown: 10
-  extraFootOffset: 0.01
-  fallbackY: 1.25
-  teleportOffsetZ: 10
+  fadeController: {fileID: 0}
 --- !u!4 &3152889161267344146 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 2b3573f4c6915d6488fa40c053d4b006, type: 3}
