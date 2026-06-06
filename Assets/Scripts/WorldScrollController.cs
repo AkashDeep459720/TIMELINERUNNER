@@ -136,14 +136,31 @@ public class WorldScrollController : MonoBehaviour
         float start = scrollSpeedProfile != null ? scrollSpeedProfile.startingScrollSpeed : baseScrollSpeed;
         float step = scrollSpeedProfile != null ? scrollSpeedProfile.speedIncreaseAmount : speedIncreaseAmount;
         if (step <= 0f) return 1;
+
+        if (scrollSpeedProfile != null)
+        {
+            float afterFirst = start + scrollSpeedProfile.firstRampBonus;
+            if (afterFirst >= max) return 1;
+            return 1 + Mathf.Max(0, Mathf.CeilToInt((max - afterFirst) / step));
+        }
+
         return Mathf.Max(1, Mathf.CeilToInt((max - start) / step));
     }
 
     private void ScheduleNextRamp()
     {
-        float interval = scrollSpeedProfile != null
-            ? scrollSpeedProfile.speedIncreaseIntervalSeconds
-            : speedIncreaseInterval;
+        float interval;
+        if (scrollSpeedProfile != null)
+        {
+            interval = rampTickCount == 0
+                ? scrollSpeedProfile.firstRampDelaySeconds
+                : scrollSpeedProfile.speedIncreaseIntervalSeconds;
+        }
+        else
+        {
+            interval = speedIncreaseInterval;
+        }
+
         nextSpeedIncreaseTime = Time.timeSinceLevelLoad + Mathf.Max(1f, interval);
     }
 

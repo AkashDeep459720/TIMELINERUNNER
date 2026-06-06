@@ -15,7 +15,9 @@ MonoBehaviour:
   startingScrollSpeed: 8
   maxScrollSpeed: 35
   useTimeBasedRamp: 1
-  speedIncreaseIntervalSeconds: 60
+  speedIncreaseIntervalSeconds: 30
+  firstRampDelaySeconds: 30
+  firstRampBonus: 5
   speedIncreaseAmount: 0.2
   pauseRampWhenScrollPaused: 1
   useRampCurve: 0

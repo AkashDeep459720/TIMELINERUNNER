@@ -10,6 +10,9 @@ public class MasterInfo : MonoBehaviour
     // Track if a retry has already been used in this run
     public static bool retryUsedThisRun = false;
 
+    /// <summary>When true, HUD coin label is not updated (e.g. during game over panel).</summary>
+    public static bool pauseHudUpdates = false;
+
     [SerializeField] private TMP_Text coinDisplay;
     private int previousCount = -1;
 
@@ -40,6 +43,8 @@ public class MasterInfo : MonoBehaviour
 
     void Update()
     {
+        if (pauseHudUpdates) return;
+
         if (coinDisplay != null && coinCount != previousCount)
         {
             coinDisplay.text = coinCount.ToString();
@@ -49,10 +54,17 @@ public class MasterInfo : MonoBehaviour
 
     public static void BankRunCoins()
     {
-        totalCoins += coinCount;
+        BankRunCoins(coinCount);
+    }
+
+    public static void BankRunCoins(int amount)
+    {
+        if (amount <= 0) return;
+
+        totalCoins += amount;
         PlayerPrefs.SetInt("TotalCoins", totalCoins);
         PlayerPrefs.Save();
-        coinCount = 0;
+        coinCount = Mathf.Max(0, coinCount - amount);
         Debug.Log("💰 Coins banked! New wallet total: " + totalCoins);
     }
 

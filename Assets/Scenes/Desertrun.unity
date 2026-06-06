@@ -1839,6 +1839,50 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &881612640 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6126392130350304697, guid: 13db12f2062bb4b4fa7bcbe0b7f59efb, type: 3}
+  m_PrefabInstance: {fileID: 2537454717816679071}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &881612641 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8209490755444780900, guid: 13db12f2062bb4b4fa7bcbe0b7f59efb, type: 3}
+  m_PrefabInstance: {fileID: 2537454717816679071}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &881612642 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9012345678901234504, guid: 13db12f2062bb4b4fa7bcbe0b7f59efb, type: 3}
+  m_PrefabInstance: {fileID: 2537454717816679071}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &881612643 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9012345678901234508, guid: 13db12f2062bb4b4fa7bcbe0b7f59efb, type: 3}
+  m_PrefabInstance: {fileID: 2537454717816679071}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &902652328
 GameObject:
   m_ObjectHideFlags: 0
@@ -3262,13 +3306,16 @@ MonoBehaviour:
   adButton: {fileID: 1857770449}
   adButtonText: {fileID: 0}
   noThanksButton: {fileID: 270498335}
-  distanceText: {fileID: 1740056946}
-  runCoinsText: {fileID: 397067383}
+  distanceText: {fileID: 881612640}
+  runCoinsText: {fileID: 881612641}
   walletCoinsText: {fileID: 776221895}
+  tapHintText: {fileID: 881612643}
+  tapToBankButton: {fileID: 881612642}
   tryAgainButton: {fileID: 996897534}
   mainMenuButton: {fileID: 449873993}
   fadeDuration: 1
   maxAdsPerRun: 3
+  coinTransferDuration: 1
 --- !u!4 &1645650920
 Transform:
   m_ObjectHideFlags: 0

@@ -57,6 +57,7 @@ public class PlayerMovement : MonoBehaviour
     [Header("Animator Sync")]
     public bool useAnimatorSpeedMultiplier = false;
     public float baseRunSpeed = 6f;
+    [SerializeField] private float animSpeedLerp = 3f;
     public string speedParam = "Speed";
 
     [Header("Swipe Settings")]
@@ -98,6 +99,7 @@ public class PlayerMovement : MonoBehaviour
 
     private Animator animator;
     private CapsuleCollider capsuleCollider;
+    private float smoothedAnimSpeed;
     private float originalColliderHeight;
     private Vector3 originalColliderCenter;
 
@@ -134,6 +136,7 @@ public class PlayerMovement : MonoBehaviour
         }
 
         originalSpeed = playerSpeed;
+        smoothedAnimSpeed = CurrentForwardSpeed();
         Application.targetFrameRate = 60;
         lockedForwardZ = transform.position.z;
 
@@ -509,7 +512,8 @@ public class PlayerMovement : MonoBehaviour
         if (animator == null) return;
         if (useAnimatorSpeedMultiplier)
         {
-            float mult = Mathf.Max(0.01f, moveSpeed / Mathf.Max(0.01f, baseRunSpeed));
+            smoothedAnimSpeed = Mathf.Lerp(smoothedAnimSpeed, moveSpeed, animSpeedLerp * Time.deltaTime);
+            float mult = Mathf.Max(0.01f, smoothedAnimSpeed / Mathf.Max(0.01f, baseRunSpeed));
             animator.speed = mult;
         }
         else
@@ -622,6 +626,7 @@ public class PlayerMovement : MonoBehaviour
         targetTilt = 0f;
         currentTilt = 0f;
         transform.rotation = Quaternion.identity;
+        smoothedAnimSpeed = CurrentForwardSpeed();
 
         if (animator != null)
         {
